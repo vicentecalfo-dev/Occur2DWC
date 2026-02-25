@@ -1,0 +1,27 @@
+version: 1
+idStrategy: preserve
+mappings:
+  occurrenceid: occurrenceID
+  scientificName: scientificName
+  scientificnamewithoutauthorship: scientificNameWithoutAuthorship
+  family: family
+  genus: genus
+  country: country
+  stateprovince: stateProvince
+  municipality: municipality
+  locality: locality
+  day: day
+  month: month
+  year: year
+  collectioncode: collectionCode
+  catalognumber: catalogNumber
+  recordedby: recordedBy
+  recordnumber: recordNumber
+  decimallatitude: decimalLatitude
+  decimallongitude: decimalLongitude
+  identifiedby: identifiedBy
+  dateidentified: dateIdentified
+  comments: occurrenceRemarks
+extras:
+  - category
+  - fonte

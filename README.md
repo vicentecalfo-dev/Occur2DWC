@@ -4,7 +4,7 @@ CLI robusto para conversão e validação de dados de ocorrência para Darwin Co
 
 ## Status
 
-Marco **M0**: bootstrap completo do projeto com arquitetura, CLI e stubs.
+Marco **M1**: comando `convert` implementado (Opção A: Simple DwC) com streaming, mapping, profiles, validação e relatório.
 
 ## Requisitos
 
@@ -32,12 +32,74 @@ npm run build
 node dist/cli.js --help
 ```
 
-Comandos disponíveis:
+## Comando convert
 
-- `convert`: converte dados de ocorrência para DwC (stub no M0)
-- `validate`: valida dados de ocorrência e estrutura DwC (stub no M0)
-- `pack`: empacota artefatos de saída (stub no M0)
-- `init`: inicializa estrutura/configuração local do projeto (stub no M0)
+Uso básico:
+
+```bash
+occur2dwc convert --in ./entrada.csv --out ./saida.tsv
+```
+
+Se `--in` não for informado, o comando lê de `stdin`.
+
+### Flags
+
+- `--in <path>`: arquivo de entrada (opcional; se ausente, stdin)
+- `--out <path>`: arquivo de saída (obrigatório)
+- `--map <path>`: arquivo de mapeamento YAML/JSON
+- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>` (padrão: `occurrence`)
+- `--input-delimiter <auto|comma|tab|semicolon>` (padrão: `auto`)
+- `--output-delimiter <tab|comma>` (padrão: `tab`)
+- `--encoding <utf8|latin1>` (padrão: `utf8`)
+- `--strict`: falha se houver qualquer erro de validação
+- `--report <path>`: salva relatório JSON
+- `--max-errors <n>` (padrão: `1000`)
+- `--id-strategy <preserve|uuid|hash>` (padrão efetivo: `preserve`)
+- `--derive-eventdate`: deriva `eventDate` ISO-8601 com `day/month/year`
+- `--extras <keep|drop|dynamicProperties>` (padrão: `keep`)
+- `--normalize-html-entities`: decodifica entidades HTML como `&amp;`
+
+### Delimitador automático de entrada
+
+Quando `--input-delimiter auto`:
+
+- usa `tab` se o cabeçalho tiver `\t`
+- senão usa `semicolon` se o cabeçalho tiver `;`
+- senão usa `comma`
+
+### Mapping
+
+Exemplo completo em [`mapping.example.yml`](./mapping.example.yml).
+
+Formato suportado:
+
+```yaml
+version: 1
+idStrategy: preserve
+mappings:
+  occurrenceid: occurrenceID
+  scientificName: scientificName
+extras:
+  - category
+  - fonte
+```
+
+### Extras
+
+- `keep`: mantém colunas extras após as colunas do profile
+- `drop`: remove colunas extras
+- `dynamicProperties`: empacota extras em `dynamicProperties` (JSON string)
+
+### Validação mínima
+
+O `convert` valida:
+
+- presença de `occurrenceID`
+- presença de `scientificName`
+- `decimalLatitude` numérico no intervalo `[-90, 90]`
+- `decimalLongitude` numérico no intervalo `[-180, 180]`
+
+Erros podem ser exportados no relatório com `--report`.
 
 ## Scripts
 
@@ -47,29 +109,28 @@ Comandos disponíveis:
 - `npm run format:check`: valida formatação com Prettier
 - `npm run test`: roda testes em watch (Vitest)
 - `npm run test:run`: roda testes uma vez
-- `npm run coverage`: cobertura com c8 sobre o build (`dist/`) usando cenário smoke do CLI
+- `npm run coverage`: cobertura com c8 sobre o build (`dist/`)
 - `npm run check`: lint + typecheck + test + build
 
-## Arquitetura (M0)
+## Arquitetura
 
 Estrutura baseada em Clean Architecture:
 
-- `src/domain`: entidades e regras de domínio base
-- `src/application`: casos de uso e portas
+- `src/domain`: entidades e regras de domínio
+- `src/application`: casos de uso e serviços de aplicação
 - `src/infrastructure`: CLI, adapters e wiring
 - `src/shared`: erros e utilitários compartilhados
-
-Neste marco, os casos de uso estão como stubs para permitir evolução incremental.
 
 ## Qualidade e automação
 
 - ESLint + Prettier
 - Husky + lint-staged (pre-commit)
 - CI com GitHub Actions
+- Vitest (unitários + integração)
 
 ## Publicação no npm
 
-O pacote já está preparado com:
+O pacote está preparado para publicação com:
 
 - `bin` configurado (`occur2dwc`)
 - `files` restrito para publicação

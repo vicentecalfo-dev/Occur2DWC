@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "CLI robusto para conversão e validação de dados de ocorrência para Darwin Core (DwC).",
   "license": "MIT",
-  "author": "",
+  "author": "Vicente Calfo <vicentecalfo@jbrj.gov.br>",
   "homepage": "https://github.com/Occur2DWC/occur2dwc#readme",
   "repository": {
     "type": "git",
@@ -31,6 +31,7 @@
   },
   "files": [
     "dist",
+    "mapping.example.yml",
     "README.md",
     "LICENSE"
   ],
@@ -61,7 +62,8 @@
     ]
   },
   "dependencies": {
-    "commander": "^14.0.1"
+    "commander": "^14.0.1",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
