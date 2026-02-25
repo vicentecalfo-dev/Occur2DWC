@@ -35,7 +35,11 @@ export function parseDelimitedLine(line: string, delimiter: string): string[] {
 
 export function formatDelimitedLine(values: readonly string[], delimiter: string): string {
   return values
-    .map((value) => {
+    .map((value, index) => {
+      if (value === '' && index === values.length - 1) {
+        return '""';
+      }
+
       const shouldQuote =
         value.includes(delimiter) ||
         value.includes('"') ||

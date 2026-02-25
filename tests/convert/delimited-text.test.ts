@@ -19,6 +19,14 @@ describe('delimited-text helpers', () => {
     expect(formatted).toBe('1,"A, B","Text ""quoted"""');
   });
 
+  it('should preserve trailing empty field by quoting it', () => {
+    const formatted = formatDelimitedLine(['id-1', ''], '\t');
+    const parsed = parseDelimitedLine(formatted, '\t');
+
+    expect(formatted).toBe('id-1\t""');
+    expect(parsed).toEqual(['id-1', '']);
+  });
+
   it('should detect delimiter automatically from header', () => {
     expect(resolveInputDelimiterFromOption('auto', 'a\tb\tc')).toBe('\t');
     expect(resolveInputDelimiterFromOption('auto', 'a;b;c')).toBe(';');
