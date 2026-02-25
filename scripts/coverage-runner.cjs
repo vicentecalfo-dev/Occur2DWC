@@ -16,6 +16,7 @@ async function main() {
   const inputPath = join(tempDir, 'input.csv');
   const outputPath = join(tempDir, 'output.tsv');
   const reportPath = join(tempDir, 'report.json');
+  const dwcaPath = join(tempDir, 'archive.zip');
 
   writeFileSync(
     inputPath,
@@ -27,7 +28,7 @@ async function main() {
 
   await runCommand(['convert', '--in', inputPath, '--out', outputPath, '--report', reportPath]);
   await runCommand(['validate', '--in', inputPath, '--max-errors', '10']);
-  await runCommand(['pack', '--source', './out', '--target', './dist/archive.zip']);
+  await runCommand(['pack', '--in', outputPath, '--out', dwcaPath]);
   await runCommand(['init', '--force']);
 
   rmSync(tempDir, { recursive: true, force: true });

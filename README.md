@@ -4,7 +4,7 @@ CLI robusto para conversão e validação de dados de ocorrência para Darwin Co
 
 ## Status
 
-Marco **M2**: comando `validate` implementado com relatório, strict mode, controle de `max-errors` e logs estruturados.
+Marco **M3**: suporte a **DwC-A (Darwin Core Archive)** com comando `pack`, geração de `meta.xml`, `eml.xml` e empacotamento `.zip`.
 
 ## Requisitos
 
@@ -17,12 +17,6 @@ Marco **M2**: comando `validate` implementado com relatório, strict mode, contr
 npm install
 ```
 
-## Uso (desenvolvimento)
-
-```bash
-npm run dev
-```
-
 ## Uso (CLI)
 
 Após build:
@@ -31,6 +25,22 @@ Após build:
 npm run build
 node dist/cli.js --help
 ```
+
+## Fluxo recomendado (M3)
+
+No M3, o fluxo recomendado é em **2 etapas**:
+
+1. `convert` para gerar Simple DwC (`.tsv`)
+2. `pack` para gerar DwC-A (`.zip`)
+
+Exemplo:
+
+```bash
+occur2dwc convert --in ./entrada.csv --out ./occurrence.tsv --output-delimiter tab
+occur2dwc pack --in ./occurrence.tsv --out ./dwca.zip
+```
+
+> `convert --format dwca` ainda não está habilitado neste marco.
 
 ## Comando convert
 
@@ -42,36 +52,24 @@ occur2dwc convert --in ./entrada.csv --out ./saida.tsv
 
 Se `--in` não for informado, o comando lê de `stdin`.
 
-### Flags
+Flags principais:
 
-- `--in <path>`: arquivo de entrada (opcional; se ausente, stdin)
-- `--out <path>`: arquivo de saída (obrigatório)
-- `--map <path>`: arquivo de mapeamento YAML/JSON
-- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>` (padrão: `occurrence`)
-- `--input-delimiter <auto|comma|tab|semicolon>` (padrão: `auto`)
-- `--output-delimiter <tab|comma>` (padrão: `tab`)
-- `--encoding <utf8|latin1>` (padrão: `utf8`)
-- `--strict`: falha se houver qualquer erro de validação
-- `--report <path>`: salva relatório JSON
-- `--max-errors <n>` (padrão: `1000`)
-- `--id-strategy <preserve|uuid|hash>` (padrão efetivo: `preserve`)
-- `--derive-eventdate`: deriva `eventDate` ISO-8601 com `day/month/year`
-- `--extras <keep|drop|dynamicProperties>` (padrão: `keep`)
-- `--normalize-html-entities`: decodifica entidades HTML como `&amp;`
+- `--in <path>`
+- `--out <path>`
+- `--map <path>`
+- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>`
+- `--input-delimiter <auto|comma|tab|semicolon>`
+- `--output-delimiter <tab|comma>`
+- `--encoding <utf8|latin1>`
+- `--strict`
+- `--report <path>`
+- `--max-errors <n>`
+- `--id-strategy <preserve|uuid|hash>`
+- `--derive-eventdate`
+- `--extras <keep|drop|dynamicProperties>`
+- `--normalize-html-entities`
 
-### Delimitador automático de entrada
-
-Quando `--input-delimiter auto`:
-
-- usa `tab` se o cabeçalho tiver `\t`
-- senão usa `semicolon` se o cabeçalho tiver `;`
-- senão usa `comma`
-
-### Mapping
-
-Exemplo completo em [`mapping.example.yml`](./mapping.example.yml).
-
-## Validação de arquivos
+## Comando validate
 
 Uso básico:
 
@@ -79,115 +77,87 @@ Uso básico:
 occur2dwc validate --in ./dados.tsv
 ```
 
-Uso com relatório:
+Suporta relatório estruturado, strict mode, logs `text/json` e controle de `max-errors`.
+
+Detalhes completos: [`docs/VALIDATION.md`](./docs/VALIDATION.md).
+
+## Comando pack (DwC-A)
+
+Uso básico:
 
 ```bash
-occur2dwc validate --in ./dados.tsv --report ./report.json
+occur2dwc pack --in ./occurrence.tsv --out ./dwca.zip
 ```
 
-### Flags do validate
+Flags:
 
-- `--in <path>`: arquivo de entrada (obrigatório)
-- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>` (padrão: `occurrence`)
+- `--in <path>`: arquivo Simple DwC (obrigatório)
+- `--out <path>`: arquivo `.zip` de saída (obrigatório)
+- `--core <occurrence>` (padrão: `occurrence`)
 - `--delimiter <auto|tab|comma|semicolon>` (padrão: `auto`)
 - `--encoding <utf8|latin1>` (padrão: `utf8`)
-- `--report <path>`: salva relatório JSON
-- `--strict`: retorna erro se houver erros de validação
-- `--max-errors <n>` (padrão: `1000`)
+- `--id-field <term>` (padrão: `occurrenceID`)
+- `--meta-only`: gera apenas `meta.xml` ao lado do `--out`
+- `--eml <path>`: usa EML customizado
+- `--generate-eml <true|false>` (padrão: `true`)
+- `--dataset-title <string>`
+- `--dataset-description <string>`
+- `--publisher <string>`
 - `--log-format <text|json>` (padrão: `text`)
-- `--quiet`: suprime logs de info/warn
-- `--verbose`: habilita logs de debug
+- `--quiet`
+- `--verbose`
 
-### O que o validate verifica
+Validações mínimas no pack:
 
-- campos obrigatórios do profile
-- `scientificName` obrigatório
-- `occurrenceID` obrigatório
-- `decimalLatitude` no intervalo `[-90, 90]`
-- `decimalLongitude` no intervalo `[-180, 180]`
-- presença em par de lat/lon (`requireLatLonPair`)
-- consistência de `day/month/year` (`validateDayMonthYear`)
+- cabeçalho válido
+- presença de `--id-field` no header
 
-O comando `validate` **não transforma dados**, apenas valida.
+Se falhar, retorna `exit code 2`.
 
-### Strict mode
+### O que entra no ZIP
 
-- com `--strict`: qualquer erro de validação retorna `exit 1`
-- sem `--strict`: retorna `exit 0` e apenas reporta falhas
+- `occurrence.txt` (TSV UTF-8, header na primeira linha)
+- `meta.xml` (core `Occurrence`, índice de ID correto)
+- `eml.xml` (customizado via `--eml` ou gerado automaticamente)
 
-### Exemplo de relatório
+### Biblioteca ZIP
 
-```json
-{
-  "summary": {
-    "totalRows": 120,
-    "errorRows": 8,
-    "warningRows": 4,
-    "totalIssues": 15,
-    "truncated": false,
-    "startTime": "2026-02-25T12:00:00.000Z",
-    "endTime": "2026-02-25T12:00:00.300Z",
-    "durationMs": 300,
-    "profile": "occurrence",
-    "strict": false,
-    "delimiter": "\t"
-  },
-  "issues": [
-    {
-      "rowNumber": 7,
-      "severity": "error",
-      "code": "required_field_missing",
-      "messagePtBr": "Campo obrigatório ausente: occurrenceID",
-      "field": "occurrenceID"
-    }
-  ]
-}
-```
+O projeto usa **archiver** por suportar escrita em streaming para ZIP, reduzindo uso de memória em arquivos grandes.
 
-### Exit codes
-
-- `0`: validação executada (com ou sem erros, quando não strict)
-- `1`: erros encontrados com `--strict`
-- `2`: erro de uso, entrada inválida ou erro de IO
-
-Detalhes em [`docs/VALIDATION.md`](./docs/VALIDATION.md).
+Detalhes completos de DwC-A: [`docs/DWCA.md`](./docs/DWCA.md).
 
 ## Scripts
 
-- `npm run build`: gera build em `dist/` com `tsup`
-- `npm run typecheck`: valida tipos TypeScript
-- `npm run lint`: executa ESLint
-- `npm run format:check`: valida formatação com Prettier
-- `npm run test`: roda testes em watch (Vitest)
-- `npm run test:run`: roda testes uma vez
-- `npm run coverage`: cobertura com Vitest (threshold global de 90% para módulos de validação)
-- `npm run coverage:c8`: cobertura smoke com c8 sobre o build (`dist/`)
+- `npm run build`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run format:check`
+- `npm run test`
+- `npm run test:run`
+- `npm run coverage`: cobertura Vitest com threshold >= 90% (escopo configurado)
+- `npm run coverage:c8`: cobertura smoke via c8 no build
 - `npm run check`: lint + typecheck + test + build
 
 ## Arquitetura
 
-Estrutura baseada em Clean Architecture:
-
-- `src/core`: casos de uso centrais
-- `src/validation`: engine e coleta de issues
-- `src/application`: serviços de aplicação
-- `src/infrastructure`: CLI, adapters e wiring
-- `src/shared`: utilitários, logger e erros compartilhados
+- `src/core`: use cases centrais
+- `src/validation`: engine/coletor de issues
+- `src/dwca`: geração de `meta.xml`, `eml.xml` e packer DwC-A
+- `src/adapters`: adapters de infraestrutura (inclui wrapper de ZIP)
+- `src/infrastructure`: CLI/wiring
+- `src/shared`: logger e erros compartilhados
 
 ## Qualidade e automação
 
 - ESLint + Prettier
-- Husky + lint-staged (pre-commit)
-- CI com GitHub Actions
+- Husky + lint-staged
 - Vitest (unitários + integração)
+- CI GitHub Actions
 
 ## Publicação no npm
 
-O pacote está preparado para publicação com:
-
 - `bin` configurado (`occur2dwc`)
-- `files` restrito para publicação
-- `prepublishOnly` com checagens
+- `prepublishOnly` com `npm run check`
 
 ## Licença
 

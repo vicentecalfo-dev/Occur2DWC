@@ -122,4 +122,56 @@ describe('buildProgram', () => {
       verbose: true,
     });
   });
+
+  it('should delegate pack action to pack handler', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'pack',
+      '--in',
+      'occurrence.tsv',
+      '--out',
+      'dwca.zip',
+      '--core',
+      'occurrence',
+      '--delimiter',
+      'tab',
+      '--encoding',
+      'utf8',
+      '--id-field',
+      'occurrenceID',
+      '--meta-only',
+      '--dataset-title',
+      'Dataset Teste',
+      '--dataset-description',
+      'Descrição',
+      '--publisher',
+      'JBRJ',
+      '--log-format',
+      'json',
+      '--quiet',
+      '--verbose',
+    ]);
+
+    expect(dependencies.packHandler.execute).toHaveBeenCalledWith({
+      inputPath: 'occurrence.tsv',
+      outputPath: 'dwca.zip',
+      core: 'occurrence',
+      delimiter: 'tab',
+      encoding: 'utf8',
+      idField: 'occurrenceID',
+      metaOnly: true,
+      emlPath: undefined,
+      generateEml: true,
+      datasetTitle: 'Dataset Teste',
+      datasetDescription: 'Descrição',
+      publisher: 'JBRJ',
+      logFormat: 'json',
+      quiet: true,
+      verbose: true,
+    });
+  });
 });

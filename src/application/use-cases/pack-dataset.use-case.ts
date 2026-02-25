@@ -1,19 +1,16 @@
 import type { CommandOutputPort } from '../ports/command-output.port';
+import { PackUseCase, type PackUseCaseInput } from '../../core/usecases/PackUseCase';
 
-export interface PackDatasetInput {
-  sourcePath: string | undefined;
-  targetPath: string | undefined;
-}
+export type PackDatasetInput = PackUseCaseInput;
 
 export class PackDatasetUseCase {
-  constructor(private readonly output: CommandOutputPort) {}
+  private readonly packUseCase: PackUseCase;
+
+  constructor(output: CommandOutputPort) {
+    this.packUseCase = new PackUseCase(output);
+  }
 
   async execute(input: PackDatasetInput): Promise<void> {
-    const details = [
-      `origem: ${input.sourcePath ?? 'não informada'}`,
-      `destino: ${input.targetPath ?? 'não informado'}`,
-    ].join(' | ');
-
-    this.output.info(`Comando pack ainda não implementado no marco M0. ${details}`);
+    await this.packUseCase.execute(input);
   }
 }

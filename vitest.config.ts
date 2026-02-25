@@ -6,7 +6,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['src/validation/IssueCollector.ts', 'src/validation/ValidatorEngine.ts'],
+      include: [
+        'src/validation/IssueCollector.ts',
+        'src/validation/ValidatorEngine.ts',
+        'src/dwca/**/*.ts',
+      ],
       thresholds: {
         lines: 90,
         statements: 90,
