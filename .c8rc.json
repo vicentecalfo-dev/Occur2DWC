@@ -1,0 +1,7 @@
+{
+  "all": true,
+  "include": ["dist/**/*.js"],
+  "exclude": ["dist/**/*.d.ts", "dist/**/*.map"],
+  "reporter": ["text", "lcov"],
+  "check-coverage": false
+}
