@@ -26,7 +26,7 @@ async function main() {
   buildProgram({ version: '0.0.0-coverage' }).helpInformation();
 
   await runCommand(['convert', '--in', inputPath, '--out', outputPath, '--report', reportPath]);
-  await runCommand(['validate', '--input', 'occurrences.csv', '--fail-fast']);
+  await runCommand(['validate', '--in', inputPath, '--max-errors', '10']);
   await runCommand(['pack', '--source', './out', '--target', './dist/archive.zip']);
   await runCommand(['init', '--force']);
 

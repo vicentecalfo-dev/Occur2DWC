@@ -4,7 +4,7 @@ CLI robusto para conversão e validação de dados de ocorrência para Darwin Co
 
 ## Status
 
-Marco **M1**: comando `convert` implementado (Opção A: Simple DwC) com streaming, mapping, profiles, validação e relatório.
+Marco **M2**: comando `validate` implementado com relatório, strict mode, controle de `max-errors` e logs estruturados.
 
 ## Requisitos
 
@@ -71,35 +71,86 @@ Quando `--input-delimiter auto`:
 
 Exemplo completo em [`mapping.example.yml`](./mapping.example.yml).
 
-Formato suportado:
+## Validação de arquivos
 
-```yaml
-version: 1
-idStrategy: preserve
-mappings:
-  occurrenceid: occurrenceID
-  scientificName: scientificName
-extras:
-  - category
-  - fonte
+Uso básico:
+
+```bash
+occur2dwc validate --in ./dados.tsv
 ```
 
-### Extras
+Uso com relatório:
 
-- `keep`: mantém colunas extras após as colunas do profile
-- `drop`: remove colunas extras
-- `dynamicProperties`: empacota extras em `dynamicProperties` (JSON string)
+```bash
+occur2dwc validate --in ./dados.tsv --report ./report.json
+```
 
-### Validação mínima
+### Flags do validate
 
-O `convert` valida:
+- `--in <path>`: arquivo de entrada (obrigatório)
+- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>` (padrão: `occurrence`)
+- `--delimiter <auto|tab|comma|semicolon>` (padrão: `auto`)
+- `--encoding <utf8|latin1>` (padrão: `utf8`)
+- `--report <path>`: salva relatório JSON
+- `--strict`: retorna erro se houver erros de validação
+- `--max-errors <n>` (padrão: `1000`)
+- `--log-format <text|json>` (padrão: `text`)
+- `--quiet`: suprime logs de info/warn
+- `--verbose`: habilita logs de debug
 
-- presença de `occurrenceID`
-- presença de `scientificName`
-- `decimalLatitude` numérico no intervalo `[-90, 90]`
-- `decimalLongitude` numérico no intervalo `[-180, 180]`
+### O que o validate verifica
 
-Erros podem ser exportados no relatório com `--report`.
+- campos obrigatórios do profile
+- `scientificName` obrigatório
+- `occurrenceID` obrigatório
+- `decimalLatitude` no intervalo `[-90, 90]`
+- `decimalLongitude` no intervalo `[-180, 180]`
+- presença em par de lat/lon (`requireLatLonPair`)
+- consistência de `day/month/year` (`validateDayMonthYear`)
+
+O comando `validate` **não transforma dados**, apenas valida.
+
+### Strict mode
+
+- com `--strict`: qualquer erro de validação retorna `exit 1`
+- sem `--strict`: retorna `exit 0` e apenas reporta falhas
+
+### Exemplo de relatório
+
+```json
+{
+  "summary": {
+    "totalRows": 120,
+    "errorRows": 8,
+    "warningRows": 4,
+    "totalIssues": 15,
+    "truncated": false,
+    "startTime": "2026-02-25T12:00:00.000Z",
+    "endTime": "2026-02-25T12:00:00.300Z",
+    "durationMs": 300,
+    "profile": "occurrence",
+    "strict": false,
+    "delimiter": "\t"
+  },
+  "issues": [
+    {
+      "rowNumber": 7,
+      "severity": "error",
+      "code": "required_field_missing",
+      "messagePtBr": "Campo obrigatório ausente: occurrenceID",
+      "field": "occurrenceID"
+    }
+  ]
+}
+```
+
+### Exit codes
+
+- `0`: validação executada (com ou sem erros, quando não strict)
+- `1`: erros encontrados com `--strict`
+- `2`: erro de uso, entrada inválida ou erro de IO
+
+Detalhes em [`docs/VALIDATION.md`](./docs/VALIDATION.md).
 
 ## Scripts
 
@@ -109,17 +160,19 @@ Erros podem ser exportados no relatório com `--report`.
 - `npm run format:check`: valida formatação com Prettier
 - `npm run test`: roda testes em watch (Vitest)
 - `npm run test:run`: roda testes uma vez
-- `npm run coverage`: cobertura com c8 sobre o build (`dist/`)
+- `npm run coverage`: cobertura com Vitest (threshold global de 90% para módulos de validação)
+- `npm run coverage:c8`: cobertura smoke com c8 sobre o build (`dist/`)
 - `npm run check`: lint + typecheck + test + build
 
 ## Arquitetura
 
 Estrutura baseada em Clean Architecture:
 
-- `src/domain`: entidades e regras de domínio
-- `src/application`: casos de uso e serviços de aplicação
+- `src/core`: casos de uso centrais
+- `src/validation`: engine e coleta de issues
+- `src/application`: serviços de aplicação
 - `src/infrastructure`: CLI, adapters e wiring
-- `src/shared`: erros e utilitários compartilhados
+- `src/shared`: utilitários, logger e erros compartilhados
 
 ## Qualidade e automação
 

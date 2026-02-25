@@ -81,4 +81,45 @@ describe('buildProgram', () => {
       normalizeHtmlEntities: false,
     });
   });
+
+  it('should delegate validate action to validate handler', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'validate',
+      '--in',
+      'dwc.tsv',
+      '--profile',
+      'minimal-occurrence',
+      '--delimiter',
+      'tab',
+      '--encoding',
+      'utf8',
+      '--report',
+      'report.json',
+      '--strict',
+      '--max-errors',
+      '20',
+      '--log-format',
+      'json',
+      '--quiet',
+      '--verbose',
+    ]);
+
+    expect(dependencies.validateHandler.execute).toHaveBeenCalledWith({
+      inputPath: 'dwc.tsv',
+      profile: 'minimal-occurrence',
+      delimiter: 'tab',
+      encoding: 'utf8',
+      reportPath: 'report.json',
+      strict: true,
+      maxErrors: 20,
+      logFormat: 'json',
+      quiet: true,
+      verbose: true,
+    });
+  });
 });

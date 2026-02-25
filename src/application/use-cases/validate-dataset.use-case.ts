@@ -1,21 +1,16 @@
 import type { CommandOutputPort } from '../ports/command-output.port';
+import { ValidateUseCase, type ValidateUseCaseInput } from '../../core/usecases/ValidateUseCase';
 
-export interface ValidateDatasetInput {
-  inputPath: string | undefined;
-  schemaPath: string | undefined;
-  failFast: boolean;
-}
+export type ValidateDatasetInput = ValidateUseCaseInput;
 
 export class ValidateDatasetUseCase {
-  constructor(private readonly output: CommandOutputPort) {}
+  private readonly validateUseCase: ValidateUseCase;
+
+  constructor(output: CommandOutputPort) {
+    this.validateUseCase = new ValidateUseCase(output);
+  }
 
   async execute(input: ValidateDatasetInput): Promise<void> {
-    const details = [
-      `entrada: ${input.inputPath ?? 'não informada'}`,
-      `schema: ${input.schemaPath ?? 'padrão'}`,
-      `fail-fast: ${String(input.failFast)}`,
-    ].join(' | ');
-
-    this.output.info(`Comando validate ainda não implementado no marco M0. ${details}`);
+    await this.validateUseCase.execute(input);
   }
 }

@@ -46,7 +46,8 @@
     "format:check": "prettier . --check",
     "test": "vitest",
     "test:run": "vitest run",
-    "coverage": "npm run build && c8 node scripts/coverage-runner.cjs",
+    "coverage": "vitest run --coverage",
+    "coverage:c8": "npm run build && c8 node scripts/coverage-runner.cjs",
     "lint-staged": "lint-staged",
     "prepare": "husky",
     "check": "npm run lint && npm run typecheck && npm run test:run && npm run build",
@@ -79,6 +80,7 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
+    "@vitest/coverage-v8": "^4.0.8",
     "vitest": "^4.0.8"
   }
 }
