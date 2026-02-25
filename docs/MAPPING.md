@@ -35,7 +35,7 @@ No comando `convert`:
 
 - `--extras keep`: mantem colunas extras como colunas adicionais
 - `--extras drop`: remove extras
-- `--extras dynamicProperties`: agrega extras em JSON no campo `dynamicProperties`
+- `--extras dynamicProperties` (padrao): agrega extras em JSON no campo `dynamicProperties`
 
 ## Presets de mapping
 

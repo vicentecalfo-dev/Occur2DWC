@@ -83,9 +83,14 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
     .option('--derive-eventdate', 'Deriva eventDate (ISO-8601) a partir de day/month/year')
     .option(
       '--extras <keep|drop|dynamicProperties>',
-      'Tratamento de colunas extras não DwC',
+      [
+        'Define o tratamento de colunas nao mapeadas:',
+        'keep              mantem como colunas adicionais',
+        'drop              descarta completamente',
+        'dynamicProperties empacota em JSON no campo dynamicProperties (padrao)',
+      ].join('\n'),
       parseExtras,
-      'keep',
+      'dynamicProperties',
     )
     .option(
       '--normalize-html-entities',

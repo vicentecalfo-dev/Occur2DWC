@@ -71,22 +71,39 @@ function appendValidationErrors(
 
 function resolveOutputColumns(
   profileColumns: readonly string[],
+  explicitTargetColumns: readonly string[],
   extraColumns: readonly string[],
   extrasMode: ExtrasMode,
 ): string[] {
+  const baseColumns = [...profileColumns];
+
+  for (const explicitTargetColumn of explicitTargetColumns) {
+    if (!baseColumns.includes(explicitTargetColumn)) {
+      baseColumns.push(explicitTargetColumn);
+    }
+  }
+
   if (extrasMode === 'drop') {
-    return [...profileColumns];
+    return baseColumns;
   }
 
   if (extrasMode === 'dynamicProperties') {
-    if (profileColumns.includes('dynamicProperties')) {
-      return [...profileColumns];
+    if (baseColumns.includes('dynamicProperties')) {
+      return baseColumns;
     }
 
-    return [...profileColumns, 'dynamicProperties'];
+    return [...baseColumns, 'dynamicProperties'];
   }
 
-  return [...profileColumns, ...extraColumns];
+  const keepColumns = [...baseColumns];
+
+  for (const extraColumn of extraColumns) {
+    if (!keepColumns.includes(extraColumn)) {
+      keepColumns.push(extraColumn);
+    }
+  }
+
+  return keepColumns;
 }
 
 async function writeLine(outputStream: Writable, line: string): Promise<void> {
@@ -131,7 +148,19 @@ function createInputStream(inputPath: string | undefined, encoding: ConvertEncod
 }
 
 function createDynamicPropertiesValue(extraValues: Record<string, string>): string {
-  const normalizedEntries = Object.entries(extraValues).filter(([, value]) => value !== '');
+  const normalizedEntries = Object.entries(extraValues)
+    .filter(([, value]) => value !== undefined && value !== null && value.trim() !== '')
+    .sort(([leftKey], [rightKey]) => {
+      if (leftKey < rightKey) {
+        return -1;
+      }
+
+      if (leftKey > rightKey) {
+        return 1;
+      }
+
+      return 0;
+    });
 
   if (normalizedEntries.length === 0) {
     return '';
@@ -241,6 +270,7 @@ export class ConvertOccurrencesUseCase {
           mappingPlan = buildMappingPlan(headerColumns, activeMappingFile, knownDwcTerms);
           outputColumns = resolveOutputColumns(
             profile.outputColumns,
+            mappingPlan.explicitTargetColumns,
             mappingPlan.extraColumns,
             input.extras,
           );

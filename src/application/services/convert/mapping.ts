@@ -118,6 +118,7 @@ export async function loadMappingFile(
 
 export interface MappingPlan {
   sourceToTarget: Map<number, string>;
+  explicitTargetColumns: string[];
   extraColumns: string[];
 }
 
@@ -128,6 +129,7 @@ export function buildMappingPlan(
 ): MappingPlan {
   const sourceToTarget = new Map<number, string>();
   const knownTermsByNormalizedName = new Map<string, string>();
+  const explicitTargetColumns: string[] = [];
 
   for (const term of knownDwcTerms) {
     knownTermsByNormalizedName.set(normalizeColumnName(term), term);
@@ -147,6 +149,9 @@ export function buildMappingPlan(
 
     if (explicitTarget) {
       sourceToTarget.set(columnIndex, explicitTarget);
+      if (!explicitTargetColumns.includes(explicitTarget)) {
+        explicitTargetColumns.push(explicitTarget);
+      }
       continue;
     }
 
@@ -162,6 +167,7 @@ export function buildMappingPlan(
   if (!mappingFile || mappingFile.extras.length === 0) {
     return {
       sourceToTarget,
+      explicitTargetColumns,
       extraColumns: [...unmappedColumns],
     };
   }
@@ -171,6 +177,7 @@ export function buildMappingPlan(
 
   return {
     sourceToTarget,
+    explicitTargetColumns,
     extraColumns: orderedExtras,
   };
 }

@@ -86,6 +86,42 @@ describe('buildProgram', () => {
     });
   });
 
+  it('should use dynamicProperties as default extras mode in convert', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'convert',
+      '--in',
+      'occurrences.csv',
+      '--out',
+      'dwc.csv',
+    ]);
+
+    expect(dependencies.convertHandler.execute).toHaveBeenCalledWith({
+      inputPath: 'occurrences.csv',
+      outputPath: 'dwc.csv',
+      mapPath: undefined,
+      profile: 'occurrence',
+      preset: 'auto',
+      inputDelimiter: 'auto',
+      outputDelimiter: 'tab',
+      encoding: 'utf8',
+      strict: false,
+      reportPath: undefined,
+      maxErrors: 1000,
+      idStrategy: undefined,
+      deriveEventDate: false,
+      extras: 'dynamicProperties',
+      normalizeHtmlEntities: false,
+      logFormat: 'text',
+      quiet: false,
+      verbose: false,
+    });
+  });
+
   it('should delegate validate action to validate handler', async () => {
     const dependencies = createMockDependencies();
     const program = buildProgram({ dependencies, version: '0.0.0-test' });

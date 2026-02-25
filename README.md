@@ -39,6 +39,28 @@ occur2dwc convert \
   --preset cncflora-proflora
 ```
 
+## Tratamento de Colunas Nao Mapeadas
+
+O `convert` suporta `--extras <keep|drop|dynamicProperties>`.
+
+- `keep`: mantem colunas nao mapeadas como colunas adicionais no final do TSV
+- `drop`: descarta colunas nao mapeadas
+- `dynamicProperties` (padrao): empacota colunas nao mapeadas em JSON no campo `dynamicProperties`
+
+No modo `dynamicProperties`:
+
+- nao inclui valores vazios
+- nao duplica colunas ja mapeadas
+- ordena as chaves do JSON em ordem alfabetica para estabilidade
+
+Exemplos:
+
+```bash
+occur2dwc convert --in dados.csv --out occurrence.tsv --extras keep
+occur2dwc convert --in dados.csv --out occurrence.tsv --extras drop
+occur2dwc convert --in dados.csv --out occurrence.tsv
+```
+
 ## Instalacao
 
 ```bash

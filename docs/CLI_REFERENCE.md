@@ -50,7 +50,7 @@ Opcoes principais:
 - `--max-errors <n>`
 - `--id-strategy <preserve|uuid|hash>`
 - `--derive-eventdate`
-- `--extras <keep|drop|dynamicProperties>`
+- `--extras <keep|drop|dynamicProperties>` (padrao: `dynamicProperties`)
 - `--normalize-html-entities`
 - `--log-format <text|json>`
 - `--quiet`
