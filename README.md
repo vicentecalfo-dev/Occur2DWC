@@ -1,164 +1,114 @@
 # Occur2DWC
 
-CLI robusto para conversão e validação de dados de ocorrência para Darwin Core (DwC).
+![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-90%25%2B-success)
+![npm version](https://img.shields.io/badge/npm-0.1.0-blue)
 
-## Status
+CLI em TypeScript para converter, validar e empacotar dados de ocorrencia no padrao Darwin Core (Simple DwC e DwC-A).
 
-Marco **M3**: suporte a **DwC-A (Darwin Core Archive)** com comando `pack`, geração de `meta.xml`, `eml.xml` e empacotamento `.zip`.
+## Motivacao
 
-## Requisitos
+Publicar dados de biodiversidade exige padrao, rastreabilidade e metadados consistentes. O Occur2DWC organiza esse fluxo em comandos claros para equipes tecnicas e curadores de dados.
 
-- Node.js LTS (recomendado: Node 20+)
-- npm 10+
+## Funcionalidades
 
-## Instalação
+- `init`: cria estrutura inicial de projeto com exemplos e templates
+- `convert`: converte CSV/TSV para Simple DwC com mapeamento e validacao de linha
+- `validate`: valida datasets sem transformar dados, com relatorio JSON
+- `pack`: gera Darwin Core Archive (`.zip`) com `occurrence.txt`, `meta.xml` e `eml.xml`
+- logs `text` ou `json`, `--quiet`, `--verbose` e colorizacao opcional
+
+## Instalacao
 
 ```bash
 npm install
+npm run build
 ```
 
-## Uso (CLI)
-
-Após build:
+Uso local:
 
 ```bash
-npm run build
 node dist/cli.js --help
 ```
 
-## Fluxo recomendado (M3)
-
-No M3, o fluxo recomendado é em **2 etapas**:
-
-1. `convert` para gerar Simple DwC (`.tsv`)
-2. `pack` para gerar DwC-A (`.zip`)
-
-Exemplo:
+Uso via pacote:
 
 ```bash
-occur2dwc convert --in ./entrada.csv --out ./occurrence.tsv --output-delimiter tab
-occur2dwc pack --in ./occurrence.tsv --out ./dwca.zip
+npx occur2dwc --help
 ```
 
-> `convert --format dwca` ainda não está habilitado neste marco.
-
-## Comando convert
-
-Uso básico:
+## Exemplos rapidos
 
 ```bash
-occur2dwc convert --in ./entrada.csv --out ./saida.tsv
+occur2dwc init
+
+occur2dwc convert \
+  --in ./examples/input.sample.csv \
+  --out ./examples/output.simple.tsv \
+  --map ./mapping.example.yml \
+  --derive-eventdate
+
+occur2dwc validate \
+  --in ./examples/output.simple.tsv \
+  --report ./examples/validate.report.json
+
+occur2dwc pack \
+  --in ./examples/output.simple.tsv \
+  --out ./examples/output.dwca.zip \
+  --eml ./eml.template.xml
 ```
 
-Se `--in` não for informado, o comando lê de `stdin`.
+## Fluxo recomendado
 
-Flags principais:
+1. `occur2dwc init` para scaffold inicial
+2. ajustar `mapping.example.yml` ao seu arquivo de origem
+3. rodar `convert` para gerar Simple DwC
+4. rodar `validate` com `--report`
+5. rodar `pack` para produzir o DwC-A final
 
-- `--in <path>`
-- `--out <path>`
-- `--map <path>`
-- `--profile <minimal-occurrence|occurrence|cncflora-occurrence>`
-- `--input-delimiter <auto|comma|tab|semicolon>`
-- `--output-delimiter <tab|comma>`
-- `--encoding <utf8|latin1>`
-- `--strict`
-- `--report <path>`
-- `--max-errors <n>`
-- `--id-strategy <preserve|uuid|hash>`
-- `--derive-eventdate`
-- `--extras <keep|drop|dynamicProperties>`
-- `--normalize-html-entities`
+## Arquitetura resumida
 
-## Comando validate
+- `src/application`: casos de uso e servicos de aplicacao
+- `src/core`: casos de uso centrais de validacao e empacotamento
+- `src/validation`: engine e coletor de issues
+- `src/dwca`: geracao de `meta.xml`, `eml.xml` e fluxo de empacotamento
+- `src/adapters`: adaptadores de infraestrutura (ZIP, IO)
+- `src/infrastructure`: CLI, wiring e apresentacao
+- `src/shared`: erros, logging e utilitarios de runtime
 
-Uso básico:
+A base segue principios de Clean Architecture com separacao clara entre dominio, aplicacao e infraestrutura.
 
-```bash
-occur2dwc validate --in ./dados.tsv
-```
+## Documentacao
 
-Suporta relatório estruturado, strict mode, logs `text/json` e controle de `max-errors`.
+- [Getting Started](./docs/GETTING_STARTED.md)
+- [Referencia do CLI](./docs/CLI_REFERENCE.md)
+- [Mapeamento](./docs/MAPPING.md)
+- [Profiles](./docs/PROFILES.md)
+- [Validacao](./docs/VALIDATION.md)
+- [DwC-A](./docs/DWCA.md)
+- [Arquitetura](./docs/ARCHITECTURE.md)
 
-Detalhes completos: [`docs/VALIDATION.md`](./docs/VALIDATION.md).
+## Contribuicao
 
-## Comando pack (DwC-A)
+1. abra uma issue com contexto e objetivo
+2. implemente com testes
+3. rode `npm run check`
+4. envie PR com descricao tecnica e evidencias
 
-Uso básico:
+## Roadmap futuro
 
-```bash
-occur2dwc pack --in ./occurrence.tsv --out ./dwca.zip
-```
+- suporte nativo a extensoes DwC-A (MeasurementOrFact, Multimidia, etc.)
+- mais perfis de validacao customizaveis por arquivo
+- melhorias de observabilidade para pipelines grandes
+- distribuicao em container oficial
 
-Flags:
+## Publicacao no npm
 
-- `--in <path>`: arquivo Simple DwC (obrigatório)
-- `--out <path>`: arquivo `.zip` de saída (obrigatório)
-- `--core <occurrence>` (padrão: `occurrence`)
-- `--delimiter <auto|tab|comma|semicolon>` (padrão: `auto`)
-- `--encoding <utf8|latin1>` (padrão: `utf8`)
-- `--id-field <term>` (padrão: `occurrenceID`)
-- `--meta-only`: gera apenas `meta.xml` ao lado do `--out`
-- `--eml <path>`: usa EML customizado
-- `--generate-eml <true|false>` (padrão: `true`)
-- `--dataset-title <string>`
-- `--dataset-description <string>`
-- `--publisher <string>`
-- `--log-format <text|json>` (padrão: `text`)
-- `--quiet`
-- `--verbose`
+- `bin` configurado para `occur2dwc`
+- `files` com whitelist (`dist`, `docs`, `README.md`, `LICENSE`)
+- `engines` definido para Node `>=20`
+- `prepublishOnly` executa build + testes
 
-Validações mínimas no pack:
-
-- cabeçalho válido
-- presença de `--id-field` no header
-
-Se falhar, retorna `exit code 2`.
-
-### O que entra no ZIP
-
-- `occurrence.txt` (TSV UTF-8, header na primeira linha)
-- `meta.xml` (core `Occurrence`, índice de ID correto)
-- `eml.xml` (customizado via `--eml` ou gerado automaticamente)
-
-### Biblioteca ZIP
-
-O projeto usa **archiver** por suportar escrita em streaming para ZIP, reduzindo uso de memória em arquivos grandes.
-
-Detalhes completos de DwC-A: [`docs/DWCA.md`](./docs/DWCA.md).
-
-## Scripts
-
-- `npm run build`
-- `npm run typecheck`
-- `npm run lint`
-- `npm run format:check`
-- `npm run test`
-- `npm run test:run`
-- `npm run coverage`: cobertura Vitest com threshold >= 90% (escopo configurado)
-- `npm run coverage:c8`: cobertura smoke via c8 no build
-- `npm run check`: lint + typecheck + test + build
-
-## Arquitetura
-
-- `src/core`: use cases centrais
-- `src/validation`: engine/coletor de issues
-- `src/dwca`: geração de `meta.xml`, `eml.xml` e packer DwC-A
-- `src/adapters`: adapters de infraestrutura (inclui wrapper de ZIP)
-- `src/infrastructure`: CLI/wiring
-- `src/shared`: logger e erros compartilhados
-
-## Qualidade e automação
-
-- ESLint + Prettier
-- Husky + lint-staged
-- Vitest (unitários + integração)
-- CI GitHub Actions
-
-## Publicação no npm
-
-- `bin` configurado (`occur2dwc`)
-- `prepublishOnly` com `npm run check`
-
-## Licença
+## Licenca
 
 MIT

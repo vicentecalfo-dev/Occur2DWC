@@ -1,16 +1,37 @@
 #!/usr/bin/env node
 
+import { formatCliFailure, resolveExitCode } from './infrastructure/cli/error-handling';
+import { resolveCliRuntimeOptions } from './infrastructure/cli/cli-runtime-options';
 import { runCli } from './infrastructure/cli/run-cli';
-import { isCliError } from './shared/errors/cli-error';
 
-void runCli().catch((error: unknown) => {
-  if (isCliError(error)) {
-    console.error(error.message);
-    process.exitCode = error.exitCode;
+const runtimeOptions = resolveCliRuntimeOptions(process.argv);
+let handledFailure = false;
+
+const handleFailure = (error: unknown): void => {
+  if (handledFailure) {
     return;
   }
 
-  const message = error instanceof Error ? error.message : 'Erro desconhecido';
-  console.error(`Erro inesperado ao executar o CLI: ${message}`);
-  process.exitCode = 1;
+  handledFailure = true;
+
+  const message = formatCliFailure(error, {
+    verbose: runtimeOptions.verbose,
+    colorEnabled: runtimeOptions.colorEnabled,
+  });
+
+  console.error(message);
+  const exitCode = resolveExitCode(error);
+  process.exitCode = exitCode;
+};
+
+process.on('unhandledRejection', (error: unknown) => {
+  handleFailure(error);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  handleFailure(error);
+});
+
+void runCli(process.argv, { runtimeOptions }).catch((error: unknown) => {
+  handleFailure(error);
 });

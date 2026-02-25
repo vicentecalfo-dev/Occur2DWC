@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { InvalidArgumentError } from 'commander';
 
 import type { CliDependencies } from '../cli-dependencies';
 import type {
@@ -8,6 +7,13 @@ import type {
   InputDelimiterOption,
 } from '../../../application/services/convert/types';
 import type { LogFormat } from '../../../shared/logging/logger';
+import {
+  parseEncoding,
+  parseInputDelimiter,
+  parseLogFormat,
+  parseMaxErrors,
+  parseProfile,
+} from './command-parsers';
 
 interface ValidateCommandOptions {
   in?: string;
@@ -20,50 +26,7 @@ interface ValidateCommandOptions {
   logFormat: LogFormat;
   quiet?: boolean;
   verbose?: boolean;
-}
-
-function parseProfile(value: string): ConvertProfileName {
-  if (value === 'minimal-occurrence' || value === 'occurrence' || value === 'cncflora-occurrence') {
-    return value;
-  }
-
-  throw new InvalidArgumentError(
-    'Perfil inválido. Use: minimal-occurrence, occurrence ou cncflora-occurrence.',
-  );
-}
-
-function parseDelimiter(value: string): InputDelimiterOption {
-  if (value === 'auto' || value === 'tab' || value === 'comma' || value === 'semicolon') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Delimitador inválido. Use: auto, tab, comma ou semicolon.');
-}
-
-function parseEncoding(value: string): ConvertEncoding {
-  if (value === 'utf8' || value === 'latin1') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Encoding inválido. Use: utf8 ou latin1.');
-}
-
-function parseLogFormat(value: string): LogFormat {
-  if (value === 'text' || value === 'json') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Formato de log inválido. Use: text ou json.');
-}
-
-function parseMaxErrors(value: string): number {
-  const parsed = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new InvalidArgumentError('A opção --max-errors precisa ser um inteiro positivo.');
-  }
-
-  return parsed;
+  color?: boolean;
 }
 
 export function registerValidateCommand(program: Command, dependencies: CliDependencies): void {
@@ -80,7 +43,7 @@ export function registerValidateCommand(program: Command, dependencies: CliDepen
     .option(
       '--delimiter <auto|tab|comma|semicolon>',
       'Delimitador de entrada',
-      parseDelimiter,
+      parseInputDelimiter,
       'auto',
     )
     .option('--encoding <utf8|latin1>', 'Codificação do arquivo', parseEncoding, 'utf8')
@@ -90,6 +53,7 @@ export function registerValidateCommand(program: Command, dependencies: CliDepen
     .option('--log-format <text|json>', 'Formato de logs da validação', parseLogFormat, 'text')
     .option('--quiet', 'Silencia logs informativos e warnings')
     .option('--verbose', 'Exibe logs de debug')
+    .option('--no-color', 'Desativa colorização da saída')
     .action(async (options: ValidateCommandOptions) => {
       await dependencies.validateHandler.execute({
         inputPath: options.in,

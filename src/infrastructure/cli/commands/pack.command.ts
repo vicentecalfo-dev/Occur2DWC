@@ -7,6 +7,11 @@ import type {
   InputDelimiterOption,
 } from '../../../application/services/convert/types';
 import type { LogFormat } from '../../../shared/logging/logger';
+import {
+  parseEncoding,
+  parseInputDelimiter,
+  parseLogFormat,
+} from './command-parsers';
 
 interface PackCommandOptions {
   in?: string;
@@ -24,6 +29,7 @@ interface PackCommandOptions {
   logFormat: LogFormat;
   quiet?: boolean;
   verbose?: boolean;
+  color?: boolean;
 }
 
 function parseCore(value: string): 'occurrence' {
@@ -32,30 +38,6 @@ function parseCore(value: string): 'occurrence' {
   }
 
   throw new InvalidArgumentError('Core inválido. Use apenas occurrence.');
-}
-
-function parseDelimiter(value: string): InputDelimiterOption {
-  if (value === 'auto' || value === 'tab' || value === 'comma' || value === 'semicolon') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Delimitador inválido. Use: auto, tab, comma ou semicolon.');
-}
-
-function parseEncoding(value: string): ConvertEncoding {
-  if (value === 'utf8' || value === 'latin1') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Encoding inválido. Use: utf8 ou latin1.');
-}
-
-function parseLogFormat(value: string): LogFormat {
-  if (value === 'text' || value === 'json') {
-    return value;
-  }
-
-  throw new InvalidArgumentError('Formato de log inválido. Use: text ou json.');
 }
 
 function parseGenerateEml(value: string): boolean {
@@ -80,7 +62,7 @@ export function registerPackCommand(program: Command, dependencies: CliDependenc
     .option(
       '--delimiter <auto|tab|comma|semicolon>',
       'Delimitador de entrada',
-      parseDelimiter,
+      parseInputDelimiter,
       'auto',
     )
     .option('--encoding <utf8|latin1>', 'Codificação do arquivo de entrada', parseEncoding, 'utf8')
@@ -99,6 +81,7 @@ export function registerPackCommand(program: Command, dependencies: CliDependenc
     .option('--log-format <text|json>', 'Formato dos logs', parseLogFormat, 'text')
     .option('--quiet', 'Silencia logs informativos e warnings')
     .option('--verbose', 'Exibe logs de debug')
+    .option('--no-color', 'Desativa colorização da saída')
     .action(async (options: PackCommandOptions) => {
       await dependencies.packHandler.execute({
         inputPath: options.in,

@@ -1,4 +1,3 @@
-import { once } from 'node:events';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -6,7 +5,7 @@ import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import { deriveEventDate } from '../services/convert/date-derive';
-import { parseDelimitedLine, formatDelimitedLine } from '../services/convert/delimited-text';
+import { formatDelimitedLine, parseDelimitedLine } from '../services/convert/delimited-text';
 import {
   resolveInputDelimiterFromOption,
   resolveOutputDelimiterFromOption,
@@ -28,6 +27,10 @@ import type {
 import { validateOccurrenceRow } from '../services/convert/validation';
 import type { CommandOutputPort } from '../ports/command-output.port';
 import { CliError } from '../../shared/errors/cli-error';
+import { formatExecutionSummary } from '../../shared/logging/execution-summary';
+import type { LogFormat } from '../../shared/logging/logger';
+import { createOutputLogger } from '../../shared/logging/output-logger';
+import { createInterruptionGuard } from '../../shared/runtime/interruption-guard';
 
 export interface ConvertOccurrencesInput {
   inputPath: string | undefined;
@@ -44,6 +47,9 @@ export interface ConvertOccurrencesInput {
   deriveEventDate: boolean;
   extras: ExtrasMode;
   normalizeHtmlEntities: boolean;
+  logFormat: LogFormat;
+  quiet: boolean;
+  verbose: boolean;
 }
 
 function appendValidationErrors(
@@ -80,11 +86,28 @@ function resolveOutputColumns(
 }
 
 async function writeLine(outputStream: Writable, line: string): Promise<void> {
-  if (outputStream.write(`${line}\n`)) {
+  await new Promise<void>((resolve, reject) => {
+    outputStream.write(`${line}\n`, (error?: Error | null) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function closeOutputStream(outputStream: Writable): Promise<void> {
+  if (outputStream.destroyed) {
     return;
   }
 
-  await once(outputStream, 'drain');
+  await new Promise<void>((resolve, reject) => {
+    outputStream.once('finish', () => resolve());
+    outputStream.once('error', (error: Error) => reject(error));
+    outputStream.end();
+  });
 }
 
 function createInputStream(inputPath: string | undefined, encoding: ConvertEncoding): Readable {
@@ -118,8 +141,23 @@ export class ConvertOccurrencesUseCase {
 
   async execute(input: ConvertOccurrencesInput): Promise<void> {
     if (!input.outputPath) {
-      throw new CliError('A opção --out <path> é obrigatória para o comando convert.', 2);
+      throw new CliError('A opcao --out <path> e obrigatoria para o comando convert.', 2);
     }
+
+    const logger = createOutputLogger(this.output, {
+      format: input.logFormat,
+      quiet: input.quiet,
+      verbose: input.verbose,
+    });
+    const interruptionGuard = createInterruptionGuard();
+    const startedAt = Date.now();
+
+    logger.info('Iniciando conversao para Simple DwC.', {
+      inputPath: input.inputPath ?? 'stdin',
+      outputPath: input.outputPath,
+      profile: input.profile,
+      strict: input.strict,
+    });
 
     const mappingFile = await loadMappingFile(input.mapPath);
     const profile = getConvertProfile(input.profile);
@@ -153,6 +191,10 @@ export class ConvertOccurrencesUseCase {
 
     try {
       for await (const rawLine of lineReader) {
+        if (interruptionGuard.isInterrupted()) {
+          throw new CliError('Execucao interrompida pelo usuario.', 130);
+        }
+
         if (!headerColumns) {
           if (rawLine.trim() === '') {
             continue;
@@ -164,7 +206,7 @@ export class ConvertOccurrencesUseCase {
           );
 
           if (headerColumns.length === 0 || headerColumns.every((column) => column === '')) {
-            throw new CliError('Cabeçalho inválido na entrada.', 2);
+            throw new CliError('Cabecalho invalido na entrada.', 2);
           }
 
           mappingPlan = buildMappingPlan(headerColumns, mappingFile, knownDwcTerms);
@@ -193,7 +235,7 @@ export class ConvertOccurrencesUseCase {
           rowErrors.push({
             row: inputRows,
             code: 'column_mismatch',
-            message: `Número de colunas incompatível na linha ${inputRows}. Esperado ${headerColumns.length}, recebido ${rowValues.length}.`,
+            message: `Numero de colunas incompativel na linha ${inputRows}. Esperado ${headerColumns.length}, recebido ${rowValues.length}.`,
           });
         }
 
@@ -251,12 +293,29 @@ export class ConvertOccurrencesUseCase {
       }
 
       if (!headerColumns) {
-        throw new CliError('Entrada sem cabeçalho. Informe um CSV/TSV válido.', 2);
+        throw new CliError('Entrada sem cabecalho. Informe um CSV/TSV valido.', 2);
       }
+    } catch (error) {
+      if (error instanceof CliError) {
+        throw error;
+      }
+
+      throw new CliError(
+        `Falha durante a conversao do arquivo "${input.inputPath ?? 'stdin'}".`,
+        2,
+      );
     } finally {
       lineReader.close();
-      outputStream.end();
-      await once(outputStream, 'finish');
+      if (input.inputPath && typeof inputStream.destroy === 'function') {
+        inputStream.destroy();
+      }
+
+      try {
+        await closeOutputStream(outputStream);
+      } catch {
+        outputStream.destroy();
+      }
+      interruptionGuard.dispose();
     }
 
     const report: ConvertReport = {
@@ -278,20 +337,43 @@ export class ConvertOccurrencesUseCase {
     if (input.reportPath) {
       await mkdir(dirname(input.reportPath), { recursive: true });
       await writeFile(input.reportPath, JSON.stringify(report, null, 2), 'utf8');
+      logger.info('Relatorio de conversao salvo.', {
+        reportPath: input.reportPath,
+      });
     }
 
-    this.output.info(
-      `Conversão concluída. Linhas lidas: ${inputRows}. Linhas válidas: ${outputRows}. Linhas inválidas: ${invalidRows}.`,
+    const durationMs = Date.now() - startedAt;
+
+    logger.info(
+      `Conversao concluida. Linhas lidas: ${inputRows}. Linhas validas: ${outputRows}. Linhas invalidas: ${invalidRows}.`,
     );
 
     if (totalErrorCount > 0) {
-      this.output.error(
-        `Foram encontrados ${totalErrorCount} erro(s) de validação durante a conversão.`,
+      logger.error(`Foram encontrados ${totalErrorCount} erro(s) de validacao durante a conversao.`);
+    }
+
+    if (input.logFormat === 'json') {
+      logger.info('Resumo final da execucao.', {
+        processedRows: inputRows,
+        validRows: outputRows,
+        warnings: 0,
+        errors: totalErrorCount,
+        durationMs,
+      });
+    } else {
+      logger.info(
+        formatExecutionSummary({
+          processedRows: inputRows,
+          validRows: outputRows,
+          warnings: 0,
+          errors: totalErrorCount,
+          durationMs,
+        }),
       );
     }
 
     if (input.strict && totalErrorCount > 0) {
-      throw new CliError('Modo --strict ativo: a conversão falhou devido a erros de validação.', 1);
+      throw new CliError('Modo --strict ativo: a conversao falhou devido a erros de validacao.', 1);
     }
   }
 }

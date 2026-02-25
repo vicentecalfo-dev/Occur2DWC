@@ -79,6 +79,9 @@ describe('buildProgram', () => {
       deriveEventDate: false,
       extras: 'keep',
       normalizeHtmlEntities: false,
+      logFormat: 'text',
+      quiet: false,
+      verbose: false,
     });
   });
 
@@ -169,6 +172,32 @@ describe('buildProgram', () => {
       datasetTitle: 'Dataset Teste',
       datasetDescription: 'Descrição',
       publisher: 'JBRJ',
+      logFormat: 'json',
+      quiet: true,
+      verbose: true,
+    });
+  });
+
+  it('should delegate init action to init handler', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'init',
+      '--dir',
+      'meu-projeto',
+      '--force',
+      '--log-format',
+      'json',
+      '--quiet',
+      '--verbose',
+    ]);
+
+    expect(dependencies.initHandler.execute).toHaveBeenCalledWith({
+      directory: 'meu-projeto',
+      force: true,
       logFormat: 'json',
       quiet: true,
       verbose: true,

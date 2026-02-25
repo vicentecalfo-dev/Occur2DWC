@@ -5,10 +5,7 @@ import { PassThrough } from 'node:stream';
 
 import { ArchiverZipWriter } from '../adapters/zip/ZipWriter';
 import type { ZipWriter } from '../adapters/zip/ZipWriter';
-import {
-  formatDelimitedLine,
-  parseDelimitedLine,
-} from '../application/services/convert/delimited-text';
+import { formatDelimitedLine, parseDelimitedLine } from '../application/services/convert/delimited-text';
 import { resolveInputDelimiterFromOption } from '../application/services/convert/delimiters';
 import type { ConvertEncoding, InputDelimiterOption } from '../application/services/convert/types';
 import { CliError } from '../shared/errors/cli-error';
@@ -28,6 +25,7 @@ export interface DwcaPackOptions {
   datasetTitle: string | undefined;
   datasetDescription: string | undefined;
   publisher: string | undefined;
+  isInterrupted?: () => boolean;
 }
 
 export interface DwcaPackResult {
@@ -35,6 +33,7 @@ export interface DwcaPackResult {
   idIndex: number;
   metaXml: string;
   warnings: string[];
+  processedRows: number;
 }
 
 export interface HeaderScanResult {
@@ -43,17 +42,26 @@ export interface HeaderScanResult {
   delimiter: '\t' | ',' | ';';
 }
 
+function assertNotInterrupted(isInterrupted: (() => boolean) | undefined): void {
+  if (isInterrupted?.()) {
+    throw new CliError('Execucao interrompida pelo usuario.', 130);
+  }
+}
+
 export async function scanDwcaInputHeader(
   inputPath: string,
   delimiterOption: InputDelimiterOption,
   encoding: ConvertEncoding,
   idField: string,
+  isInterrupted?: () => boolean,
 ): Promise<HeaderScanResult> {
   const inputStream = createReadStream(inputPath, { encoding });
   const lineReader = createInterface({ input: inputStream, crlfDelay: Infinity });
 
   try {
     for await (const rawLine of lineReader) {
+      assertNotInterrupted(isInterrupted);
+
       if (rawLine.trim() === '') {
         continue;
       }
@@ -64,14 +72,14 @@ export async function scanDwcaInputHeader(
       );
 
       if (headerColumns.length === 0 || headerColumns.every((column) => column === '')) {
-        throw new CliError('Cabeçalho inválido no arquivo de entrada.', 2);
+        throw new CliError('Cabecalho invalido no arquivo de entrada.', 2);
       }
 
       const idIndex = headerColumns.indexOf(idField);
 
       if (idIndex < 0) {
         throw new CliError(
-          `Campo de ID "${idField}" não encontrado no cabeçalho do arquivo de entrada.`,
+          `Campo de ID "${idField}" nao encontrado no cabecalho do arquivo de entrada.`,
           2,
         );
       }
@@ -83,9 +91,10 @@ export async function scanDwcaInputHeader(
       };
     }
 
-    throw new CliError('Arquivo de entrada sem cabeçalho válido.', 2);
+    throw new CliError('Arquivo de entrada sem cabecalho valido.', 2);
   } finally {
     lineReader.close();
+    inputStream.destroy();
   }
 }
 
@@ -94,7 +103,8 @@ async function streamOccurrenceAsTsv(
   inputPath: string,
   delimiter: '\t' | ',' | ';',
   encoding: ConvertEncoding,
-): Promise<void> {
+  isInterrupted?: () => boolean,
+): Promise<number> {
   const inputStream = createReadStream(inputPath, { encoding });
   const lineReader = createInterface({ input: inputStream, crlfDelay: Infinity });
   const occurrenceStream = new PassThrough();
@@ -102,9 +112,12 @@ async function streamOccurrenceAsTsv(
   zipWriter.addStream('occurrence.txt', occurrenceStream);
 
   let headerWritten = false;
+  let rowsWritten = 0;
 
   try {
     for await (const rawLine of lineReader) {
+      assertNotInterrupted(isInterrupted);
+
       if (!headerWritten && rawLine.trim() === '') {
         continue;
       }
@@ -119,10 +132,17 @@ async function streamOccurrenceAsTsv(
         await once(occurrenceStream, 'drain');
       }
 
+      if (headerWritten) {
+        rowsWritten += 1;
+      }
+
       headerWritten = true;
     }
+
+    return rowsWritten;
   } finally {
     lineReader.close();
+    inputStream.destroy();
     occurrenceStream.end();
   }
 }
@@ -146,6 +166,7 @@ export class DwcaPacker {
       options.delimiter,
       options.encoding,
       options.idField,
+      options.isInterrupted,
     );
 
     const metaResult = this.metaXmlBuilder.build({
@@ -163,37 +184,48 @@ export class DwcaPacker {
         idIndex: metaResult.idIndex,
         metaXml: metaResult.xml,
         warnings: metaResult.warnings,
+        processedRows: 0,
       };
     }
 
     const zipWriter = new ArchiverZipWriter(options.outputPath);
 
-    await streamOccurrenceAsTsv(
-      zipWriter,
-      options.inputPath,
-      headerScan.delimiter,
-      options.encoding,
-    );
-    zipWriter.addString('meta.xml', metaResult.xml);
+    try {
+      const processedRows = await streamOccurrenceAsTsv(
+        zipWriter,
+        options.inputPath,
+        headerScan.delimiter,
+        options.encoding,
+        options.isInterrupted,
+      );
 
-    if (options.emlPath) {
-      zipWriter.addFile(options.emlPath, 'eml.xml');
-    } else if (options.generateEml) {
-      const emlXml = this.emlBuilder.build({
-        datasetTitle: options.datasetTitle,
-        datasetDescription: options.datasetDescription,
-        publisher: options.publisher,
-      });
-      zipWriter.addString('eml.xml', emlXml);
+      assertNotInterrupted(options.isInterrupted);
+      zipWriter.addString('meta.xml', metaResult.xml);
+
+      if (options.emlPath) {
+        zipWriter.addFile(options.emlPath, 'eml.xml');
+      } else if (options.generateEml) {
+        const emlXml = this.emlBuilder.build({
+          datasetTitle: options.datasetTitle,
+          datasetDescription: options.datasetDescription,
+          publisher: options.publisher,
+        });
+        zipWriter.addString('eml.xml', emlXml);
+      }
+
+      assertNotInterrupted(options.isInterrupted);
+      await zipWriter.finalize();
+
+      return {
+        headerColumns: headerScan.headerColumns,
+        idIndex: metaResult.idIndex,
+        metaXml: metaResult.xml,
+        warnings: metaResult.warnings,
+        processedRows,
+      };
+    } catch (error) {
+      await zipWriter.abort();
+      throw error;
     }
-
-    await zipWriter.finalize();
-
-    return {
-      headerColumns: headerScan.headerColumns,
-      idIndex: metaResult.idIndex,
-      metaXml: metaResult.xml,
-      warnings: metaResult.warnings,
-    };
   }
 }

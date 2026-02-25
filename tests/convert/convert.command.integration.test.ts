@@ -119,7 +119,7 @@ describe('convert command integration', () => {
       expect(reportContent.summary.invalidRows).toBe(1);
       expect(reportContent.summary.errorCount).toBeGreaterThanOrEqual(1);
 
-      expect(output.infos.some((entry) => entry.includes('Conversão concluída'))).toBe(true);
+      expect(output.infos.some((entry) => entry.includes('Conversao concluida'))).toBe(true);
       expect(output.errors.length).toBe(1);
     } finally {
       await rm(tempDir, { recursive: true, force: true });

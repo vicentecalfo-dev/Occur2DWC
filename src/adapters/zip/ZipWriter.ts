@@ -8,6 +8,7 @@ export interface ZipWriter {
   addString(pathInZip: string, content: string): void;
   addFile(sourcePath: string, pathInZip: string): void;
   finalize(): Promise<void>;
+  abort(): Promise<void>;
 }
 
 export class ArchiverZipWriter implements ZipWriter {
@@ -36,18 +37,26 @@ export class ArchiverZipWriter implements ZipWriter {
 
   async finalize(): Promise<void> {
     const completion = new Promise<void>((resolve, reject) => {
-      this.outputStream.on('close', () => {
+      this.outputStream.once('close', () => {
         resolve();
       });
-      this.outputStream.on('error', (error: Error) => {
+      this.outputStream.once('error', (error: Error) => {
         reject(error);
       });
-      this.archive.on('error', (error: Error) => {
+      this.archive.once('error', (error: Error) => {
         reject(error);
       });
     });
 
     await this.archive.finalize();
     await completion;
+  }
+
+  async abort(): Promise<void> {
+    this.archive.abort();
+
+    if (!this.outputStream.destroyed) {
+      this.outputStream.destroy();
+    }
   }
 }

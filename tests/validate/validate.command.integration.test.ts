@@ -42,7 +42,7 @@ describe('validate command integration', () => {
     await program.parseAsync(['node', 'occur2dwc', 'validate', '--in', validFixturePath]);
 
     expect(output.errors).toHaveLength(0);
-    expect(output.infos.some((entry) => entry.includes('Validação concluída'))).toBe(true);
+    expect(output.infos.some((entry) => entry.includes('Validacao concluida'))).toBe(true);
   });
 
   it('should generate report for invalid fixture', async () => {

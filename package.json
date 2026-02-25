@@ -1,7 +1,7 @@
 {
   "name": "occur2dwc",
   "version": "0.1.0",
-  "description": "CLI robusto para conversão e validação de dados de ocorrência para Darwin Core (DwC).",
+  "description": "CLI para inicializar, converter, validar e empacotar dados de ocorrencia em Darwin Core (DwC).",
   "license": "MIT",
   "author": "Vicente Calfo <vicentecalfo@jbrj.gov.br>",
   "homepage": "https://github.com/Occur2DWC/occur2dwc#readme",
@@ -14,12 +14,17 @@
   },
   "keywords": [
     "darwin-core",
+    "darwin-core-archive",
     "dwc",
+    "dwca",
     "biodiversity",
+    "biodiversity-data",
+    "gbif",
     "cli",
     "typescript",
     "validation",
-    "conversion"
+    "conversion",
+    "data-publishing"
   ],
   "engines": {
     "node": ">=20.0.0"
@@ -31,7 +36,7 @@
   },
   "files": [
     "dist",
-    "mapping.example.yml",
+    "docs",
     "README.md",
     "LICENSE"
   ],
@@ -51,7 +56,7 @@
     "lint-staged": "lint-staged",
     "prepare": "husky",
     "check": "npm run lint && npm run typecheck && npm run test:run && npm run build",
-    "prepublishOnly": "npm run check"
+    "prepublishOnly": "npm run build && npm run test:run"
   },
   "lint-staged": {
     "*.{ts,js,mjs,cjs}": [

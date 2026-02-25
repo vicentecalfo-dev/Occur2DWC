@@ -25,7 +25,11 @@ export function buildProgram(options: BuildProgramOptions = {}): Command {
   program
     .name(PROJECT_NAME)
     .description(`${PROJECT_BRAND}: ${PROJECT_DESCRIPTION}`)
-    .version(options.version ?? process.env.npm_package_version ?? DEFAULT_VERSION);
+    .version(options.version ?? process.env.npm_package_version ?? DEFAULT_VERSION)
+    .showSuggestionAfterError(true)
+    .showHelpAfterError('\nDica: use --help para ver exemplos de uso.')
+    .option('--no-color', 'Desativa colorização da saída')
+    .exitOverride();
 
   registerConvertCommand(program, dependencies);
   registerValidateCommand(program, dependencies);
