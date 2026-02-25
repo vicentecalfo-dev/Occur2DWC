@@ -18,6 +18,27 @@ Publicar dados de biodiversidade exige padrao, rastreabilidade e metadados consi
 - `pack`: gera Darwin Core Archive (`.zip`) com `occurrence.txt`, `meta.xml` e `eml.xml`
 - logs `text` ou `json`, `--quiet`, `--verbose` e colorizacao opcional
 
+## Presets de mapping
+
+O comando `convert` possui preset interno `cncflora-proflora` para layouts ProFlora/CNCFlora.
+
+- aplicacao automatica (modo padrao `--preset auto`):
+  - quando o cabecalho tiver `taxon_flora_id` ou `scientific_name` ou `decimal_latitude`
+- forcar preset:
+  - `--preset cncflora-proflora`
+- desativar preset interno:
+  - `--preset none`
+
+Exemplo com CSV delimitado por `;`:
+
+```bash
+occur2dwc convert \
+  --in dados.csv \
+  --out occurrence.tsv \
+  --input-delimiter semicolon \
+  --preset cncflora-proflora
+```
+
 ## Instalacao
 
 ```bash

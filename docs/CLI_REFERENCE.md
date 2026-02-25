@@ -40,6 +40,7 @@ Opcoes principais:
 - `--in <path>`
 - `--out <path>`
 - `--map <path>`
+- `--preset <auto|cncflora-proflora|none>`
 - `--profile <minimal-occurrence|occurrence|cncflora-occurrence>`
 - `--input-delimiter <auto|comma|tab|semicolon>`
 - `--output-delimiter <tab|comma>`

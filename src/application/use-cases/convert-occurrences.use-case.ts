@@ -11,11 +11,14 @@ import {
   resolveOutputDelimiterFromOption,
 } from '../services/convert/delimiters';
 import { applyIdStrategy } from '../services/convert/identifiers';
-import { buildMappingPlan, loadMappingFile } from '../services/convert/mapping';
+import { buildMappingPlan, loadMappingFile, type MappingDocument } from '../services/convert/mapping';
+import { getInternalMappingDocument } from '../services/convert/preset-mappings';
+import { resolveMappingPreset } from '../services/convert/preset-detector';
 import { getConvertProfile, getKnownDwcTerms } from '../services/convert/profiles';
 import { normalizeCellValue } from '../services/convert/text';
 import type {
   ConvertEncoding,
+  ConvertMappingPreset,
   ConvertProfileName,
   ConvertReport,
   ConvertValidationError,
@@ -37,6 +40,7 @@ export interface ConvertOccurrencesInput {
   outputPath: string | undefined;
   mapPath: string | undefined;
   profile: ConvertProfileName;
+  preset: ConvertMappingPreset;
   inputDelimiter: InputDelimiterOption;
   outputDelimiter: OutputDelimiterOption;
   encoding: ConvertEncoding;
@@ -159,10 +163,11 @@ export class ConvertOccurrencesUseCase {
       strict: input.strict,
     });
 
-    const mappingFile = await loadMappingFile(input.mapPath);
+    const userMappingFile = await loadMappingFile(input.mapPath);
+    let activeMappingFile: MappingDocument | undefined = userMappingFile;
+    let effectiveIdStrategy: IdStrategy = input.idStrategy ?? userMappingFile?.idStrategy ?? 'preserve';
     const profile = getConvertProfile(input.profile);
     const knownDwcTerms = getKnownDwcTerms();
-    const effectiveIdStrategy = input.idStrategy ?? mappingFile?.idStrategy ?? 'preserve';
 
     const outputDelimiter = resolveOutputDelimiterFromOption(input.outputDelimiter);
     const inputStream = createInputStream(input.inputPath, input.encoding);
@@ -209,7 +214,31 @@ export class ConvertOccurrencesUseCase {
             throw new CliError('Cabecalho invalido na entrada.', 2);
           }
 
-          mappingPlan = buildMappingPlan(headerColumns, mappingFile, knownDwcTerms);
+          const presetResolution = resolveMappingPreset({
+            mapPath: input.mapPath,
+            preset: input.preset,
+            headerColumns,
+          });
+
+          if (!activeMappingFile && presetResolution.presetName) {
+            activeMappingFile = getInternalMappingDocument(presetResolution.presetName);
+
+            if (presetResolution.reason === 'forced') {
+              logger.info(
+                `Preset de mapeamento "${presetResolution.presetName}" aplicado via --preset.`,
+              );
+            } else if (presetResolution.reason === 'heuristic') {
+              logger.info(
+                `Preset de mapeamento "${presetResolution.presetName}" aplicado automaticamente com base no cabecalho.`,
+              );
+            }
+
+            if (!input.idStrategy && activeMappingFile.idStrategy) {
+              effectiveIdStrategy = activeMappingFile.idStrategy;
+            }
+          }
+
+          mappingPlan = buildMappingPlan(headerColumns, activeMappingFile, knownDwcTerms);
           outputColumns = resolveOutputColumns(
             profile.outputColumns,
             mappingPlan.extraColumns,

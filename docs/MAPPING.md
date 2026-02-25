@@ -37,6 +37,25 @@ No comando `convert`:
 - `--extras drop`: remove extras
 - `--extras dynamicProperties`: agrega extras em JSON no campo `dynamicProperties`
 
+## Presets de mapping
+
+O `convert` suporta preset interno `cncflora-proflora`.
+
+- `--preset auto` (padrao):
+  - ativa automaticamente quando o cabecalho tiver `taxon_flora_id`, `scientific_name` ou `decimal_latitude`
+- `--preset cncflora-proflora`:
+  - forca uso do mapping interno
+- `--preset none`:
+  - desliga presets internos e usa apenas auto-map/synonyms (exceto se `--map` for informado)
+
+`--map` sempre tem prioridade sobre qualquer preset.
+
+Exemplo:
+
+```bash
+occur2dwc convert --in dados.csv --out occurrence.tsv --input-delimiter semicolon --preset cncflora-proflora
+```
+
 ## Boas praticas
 
 - normalize nomes de coluna na origem

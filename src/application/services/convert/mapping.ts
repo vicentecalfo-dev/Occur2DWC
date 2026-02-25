@@ -7,8 +7,9 @@ import { CliError } from '../../../shared/errors/cli-error';
 import type { IdStrategy } from './types';
 import { normalizeColumnName } from './text';
 
-interface MappingFileDocument {
+export interface MappingDocument {
   version: number;
+  name?: string;
   idStrategy?: IdStrategy;
   mappings: Record<string, string>;
   extras: string[];
@@ -54,7 +55,7 @@ function toStringArray(value: unknown): string[] {
 
 export async function loadMappingFile(
   path: string | undefined,
-): Promise<MappingFileDocument | undefined> {
+): Promise<MappingDocument | undefined> {
   if (!path) {
     return undefined;
   }
@@ -97,11 +98,16 @@ export async function loadMappingFile(
   }
 
   const idStrategy = parseIdStrategy(parsed.idStrategy);
-  const result: MappingFileDocument = {
+  const name = typeof parsed.name === 'string' && parsed.name.trim() !== '' ? parsed.name.trim() : undefined;
+  const result: MappingDocument = {
     version,
     mappings,
     extras: toStringArray(parsed.extras),
   };
+
+  if (name) {
+    result.name = name;
+  }
 
   if (idStrategy) {
     result.idStrategy = idStrategy;
@@ -117,7 +123,7 @@ export interface MappingPlan {
 
 export function buildMappingPlan(
   headerColumns: readonly string[],
-  mappingFile: MappingFileDocument | undefined,
+  mappingFile: MappingDocument | undefined,
   knownDwcTerms: readonly string[],
 ): MappingPlan {
   const sourceToTarget = new Map<number, string>();

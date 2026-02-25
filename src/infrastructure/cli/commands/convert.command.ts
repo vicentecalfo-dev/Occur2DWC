@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 import type { CliDependencies } from '../cli-dependencies';
 import type {
   ConvertEncoding,
+  ConvertMappingPreset,
   ConvertProfileName,
   ExtrasMode,
   IdStrategy,
@@ -12,6 +13,7 @@ import type {
 import type { LogFormat } from '../../../shared/logging/logger';
 import {
   parseEncoding,
+  parseConvertPreset,
   parseExtras,
   parseIdStrategy,
   parseInputDelimiter,
@@ -26,6 +28,7 @@ interface ConvertCommandOptions {
   out?: string;
   map?: string;
   profile: ConvertProfileName;
+  preset: ConvertMappingPreset;
   inputDelimiter: InputDelimiterOption;
   outputDelimiter: OutputDelimiterOption;
   encoding: ConvertEncoding;
@@ -49,6 +52,12 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
     .option('--in <path>', 'Arquivo de entrada (opcional; se ausente, lê de stdin)')
     .option('--out <path>', 'Arquivo de saída (obrigatório)')
     .option('--map <path>', 'Arquivo de mapeamento YAML/JSON')
+    .option(
+      '--preset <auto|cncflora-proflora|none>',
+      'Preset interno de mapeamento (padrao: auto)',
+      parseConvertPreset,
+      'auto',
+    )
     .option(
       '--profile <minimal-occurrence|occurrence|cncflora-occurrence>',
       'Perfil de saída DwC',
@@ -86,12 +95,22 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
     .option('--quiet', 'Silencia logs informativos e warnings')
     .option('--verbose', 'Exibe logs de debug')
     .option('--no-color', 'Desativa colorização da saída')
+    .addHelpText(
+      'after',
+      [
+        '',
+        'Exemplos:',
+        '  occur2dwc convert --in entrada.csv --out occurrence.tsv',
+        '  occur2dwc convert --in dados.csv --out occurrence.tsv --input-delimiter semicolon --preset cncflora-proflora',
+      ].join('\n'),
+    )
     .action(async (options: ConvertCommandOptions) => {
       await dependencies.convertHandler.execute({
         inputPath: options.in,
         outputPath: options.out,
         mapPath: options.map,
         profile: options.profile,
+        preset: options.preset,
         inputDelimiter: options.inputDelimiter,
         outputDelimiter: options.outputDelimiter,
         encoding: options.encoding,

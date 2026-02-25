@@ -10,6 +10,8 @@ export type IdStrategy = 'preserve' | 'uuid' | 'hash';
 
 export type ExtrasMode = 'keep' | 'drop' | 'dynamicProperties';
 
+export type ConvertMappingPreset = 'auto' | 'cncflora-proflora' | 'none';
+
 export interface ConvertValidationError {
   row: number;
   code:

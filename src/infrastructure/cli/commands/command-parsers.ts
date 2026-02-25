@@ -2,6 +2,7 @@ import { InvalidArgumentError } from 'commander';
 
 import type {
   ConvertEncoding,
+  ConvertMappingPreset,
   ConvertProfileName,
   ExtrasMode,
   IdStrategy,
@@ -86,4 +87,14 @@ export function parseExtras(value: string): ExtrasMode {
   }
 
   throw new InvalidArgumentError('extras inválido. Use: keep, drop ou dynamicProperties.');
+}
+
+export function parseConvertPreset(value: string): ConvertMappingPreset {
+  if (value === 'auto' || value === 'cncflora-proflora' || value === 'none') {
+    return value;
+  }
+
+  throw new InvalidArgumentError(
+    'Preset inválido. Use: auto, cncflora-proflora ou none.',
+  );
 }

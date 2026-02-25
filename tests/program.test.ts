@@ -69,6 +69,7 @@ describe('buildProgram', () => {
       outputPath: 'dwc.csv',
       mapPath: undefined,
       profile: 'occurrence',
+      preset: 'auto',
       inputDelimiter: 'auto',
       outputDelimiter: 'tab',
       encoding: 'utf8',
