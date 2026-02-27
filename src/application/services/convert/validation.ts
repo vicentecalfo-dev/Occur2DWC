@@ -1,5 +1,9 @@
 import type { ConvertProfileDefinition } from './profiles';
-import type { ConvertValidationError } from './types';
+import type {
+  ConvertValidationError,
+  ConvertValidationMode,
+  ConvertValidationWarning,
+} from './types';
 
 function isMissing(value: string | undefined): boolean {
   return !value || value.trim() === '';
@@ -27,9 +31,51 @@ function validateNumberInRange(
   return 'valid';
 }
 
+function createWarningFromError(error: ConvertValidationError): ConvertValidationWarning {
+  if (error.code === 'required_field_missing') {
+    return {
+      row: error.row,
+      code: 'missing_value',
+      message: 'missing value',
+      field: error.field,
+    };
+  }
+
+  if (error.code === 'invalid_decimal_latitude' || error.code === 'invalid_decimal_longitude') {
+    return {
+      row: error.row,
+      code: 'invalid_value',
+      message: 'invalid value',
+      field: error.field,
+    };
+  }
+
+  return {
+    row: error.row,
+    code: 'column_mismatch',
+    message: 'column mismatch',
+    field: error.field,
+  };
+}
+
+export interface ConvertRowValidationResult {
+  normalizedRow: Record<string, string>;
+  errors: ConvertValidationError[];
+  warnings: ConvertValidationWarning[];
+  ok: boolean;
+}
+
+export function normalizeOutputValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  return String(value);
+}
+
 export function validateOccurrenceRow(
   rowNumber: number,
-  row: Record<string, string>,
+  row: Record<string, string | undefined>,
   profile: ConvertProfileDefinition,
 ): ConvertValidationError[] {
   const errors: ConvertValidationError[] = [];
@@ -68,4 +114,41 @@ export function validateOccurrenceRow(
   }
 
   return errors;
+}
+
+export function validateConvertRow(
+  rowNumber: number,
+  row: Record<string, string | undefined>,
+  profile: ConvertProfileDefinition,
+  mode: ConvertValidationMode,
+  additionalErrors: readonly ConvertValidationError[] = [],
+): ConvertRowValidationResult {
+  const normalizedRow = Object.fromEntries(
+    Object.entries(row).map(([field, value]) => [field, normalizeOutputValue(value)]),
+  );
+  const errors = [...additionalErrors, ...validateOccurrenceRow(rowNumber, normalizedRow, profile)];
+
+  if (mode === 'strict') {
+    return {
+      normalizedRow,
+      errors,
+      warnings: [],
+      ok: errors.length === 0,
+    };
+  }
+
+  const warnings = errors.map((error) => createWarningFromError(error));
+
+  for (const error of errors) {
+    if (error.field) {
+      normalizedRow[error.field] = '';
+    }
+  }
+
+  return {
+    normalizedRow,
+    errors: [],
+    warnings,
+    ok: true,
+  };
 }

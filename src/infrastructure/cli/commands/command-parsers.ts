@@ -4,6 +4,7 @@ import type {
   ConvertEncoding,
   ConvertMappingPreset,
   ConvertProfileName,
+  ConvertValidationMode,
   ExtrasMode,
   IdStrategy,
   InputDelimiterOption,
@@ -94,7 +95,13 @@ export function parseConvertPreset(value: string): ConvertMappingPreset {
     return value;
   }
 
-  throw new InvalidArgumentError(
-    'Preset inválido. Use: auto, cncflora-proflora ou none.',
-  );
+  throw new InvalidArgumentError('Preset inválido. Use: auto, cncflora-proflora ou none.');
+}
+
+export function parseValidationMode(value: string): ConvertValidationMode {
+  if (value === 'strict' || value === 'lenient') {
+    return value;
+  }
+
+  throw new InvalidArgumentError('Modo de validacao inválido. Use: strict ou lenient.');
 }

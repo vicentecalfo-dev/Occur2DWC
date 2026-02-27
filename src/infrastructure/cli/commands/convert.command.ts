@@ -5,6 +5,7 @@ import type {
   ConvertEncoding,
   ConvertMappingPreset,
   ConvertProfileName,
+  ConvertValidationMode,
   ExtrasMode,
   IdStrategy,
   InputDelimiterOption,
@@ -21,17 +22,20 @@ import {
   parseMaxErrors,
   parseOutputDelimiter,
   parseProfile,
+  parseValidationMode,
 } from './command-parsers';
 
 interface ConvertCommandOptions {
   in?: string;
   out?: string;
   map?: string;
+  mapping?: string;
   profile: ConvertProfileName;
   preset: ConvertMappingPreset;
   inputDelimiter: InputDelimiterOption;
   outputDelimiter: OutputDelimiterOption;
   encoding: ConvertEncoding;
+  validation: ConvertValidationMode;
   strict?: boolean;
   report?: string;
   maxErrors: number;
@@ -52,6 +56,7 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
     .option('--in <path>', 'Arquivo de entrada (opcional; se ausente, lê de stdin)')
     .option('--out <path>', 'Arquivo de saída (obrigatório)')
     .option('--map <path>', 'Arquivo de mapeamento YAML/JSON')
+    .option('--mapping <path>', 'Alias de --map')
     .option(
       '--preset <auto|cncflora-proflora|none>',
       'Preset interno de mapeamento (padrao: auto)',
@@ -72,7 +77,20 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
     )
     .option('--output-delimiter <tab|comma>', 'Delimitador da saída', parseOutputDelimiter, 'tab')
     .option('--encoding <utf8|latin1>', 'Codificação de entrada e saída', parseEncoding, 'utf8')
-    .option('--strict', 'Falha se houver qualquer erro de validação')
+    .option(
+      '--validation <strict|lenient>',
+      [
+        'Modo de validacao da conversao (padrao: strict):',
+        'strict  valida e remove linhas invalidas da saida',
+        'lenient nao remove linhas por validacao; campos invalidos/vazios viram string vazia ("")',
+      ].join('\n'),
+      parseValidationMode,
+      'strict',
+    )
+    .option(
+      '--strict',
+      'Falha ao final (codigo 1) se houver erros de validacao; nao altera a estrategia de linha do --validation',
+    )
     .option('--report <path>', 'Caminho para gravar relatório JSON da conversão')
     .option('--max-errors <n>', 'Máximo de erros no relatório', parseMaxErrors, 1000)
     .option(
@@ -106,6 +124,8 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
         '',
         'Exemplos:',
         '  occur2dwc convert --in entrada.csv --out occurrence.tsv',
+        '  occur2dwc convert --in entrada.csv --out occurrence.tsv --validation strict',
+        '  occur2dwc convert --in entrada.csv --out occurrence.tsv --validation lenient',
         '  occur2dwc convert --in dados.csv --out occurrence.tsv --input-delimiter semicolon --preset cncflora-proflora',
       ].join('\n'),
     )
@@ -113,12 +133,13 @@ export function registerConvertCommand(program: Command, dependencies: CliDepend
       await dependencies.convertHandler.execute({
         inputPath: options.in,
         outputPath: options.out,
-        mapPath: options.map,
+        mapPath: options.map ?? options.mapping,
         profile: options.profile,
         preset: options.preset,
         inputDelimiter: options.inputDelimiter,
         outputDelimiter: options.outputDelimiter,
         encoding: options.encoding,
+        validationMode: options.validation,
         strict: Boolean(options.strict),
         reportPath: options.report,
         maxErrors: options.maxErrors,

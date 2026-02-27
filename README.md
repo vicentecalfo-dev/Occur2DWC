@@ -140,19 +140,20 @@ Use `convert` quando o dataset de origem ainda nao esta no padrao DwC, ou quando
 
 ### Opcoes principais
 
-| Opcao | Descricao tecnica |
-| --- | --- |
-| `--in <path>` | Arquivo de entrada (opcional; se ausente, le de `stdin`). |
-| `--out <path>` | Arquivo de saida (obrigatorio). |
-| `--map <path>` | Arquivo YAML/JSON com `version: 1` e bloco `mappings`. |
-| `--preset <auto|cncflora-proflora|none>` | Preset interno de mapeamento. Padrao: `auto`. |
-| `--profile <minimal-occurrence|occurrence|cncflora-occurrence>` | Define colunas alvo e campos obrigatorios. Padrao: `occurrence`. |
-| `--derive-eventdate` | Deriva `eventDate` (ISO-8601) a partir de `day/month/year` quando `eventDate` estiver vazio. |
-| `--extras <keep|drop|dynamicProperties>` | Define estrategia para colunas nao mapeadas. Padrao: `dynamicProperties`. |
-| `--strict` | Retorna erro (codigo 1) se houver qualquer erro de validacao na conversao. |
-| `--report <path>` | Salva relatorio JSON da conversao. |
-| `--input-delimiter <auto|comma|tab|semicolon>` | Delimitador da entrada. Padrao: `auto`. |
-| `--output-delimiter <tab|comma>` | Delimitador da saida. Padrao: `tab`. |
+| Opcao                          | Descricao tecnica                                                                            |
+| ------------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------- |
+| `--in <path>`                  | Arquivo de entrada (opcional; se ausente, le de `stdin`).                                    |
+| `--out <path>`                 | Arquivo de saida (obrigatorio).                                                              |
+| `--map <path>`                 | Arquivo YAML/JSON com `version: 1` e bloco `mappings` (alias: `--mapping`).                  |
+| `--preset <auto                | cncflora-proflora                                                                            | none>`                                                | Preset interno de mapeamento. Padrao: `auto`.                             |
+| `--profile <minimal-occurrence | occurrence                                                                                   | cncflora-occurrence>`                                 | Define colunas alvo e campos obrigatorios. Padrao: `occurrence`.          |
+| `--derive-eventdate`           | Deriva `eventDate` (ISO-8601) a partir de `day/month/year` quando `eventDate` estiver vazio. |
+| `--extras <keep                | drop                                                                                         | dynamicProperties>`                                   | Define estrategia para colunas nao mapeadas. Padrao: `dynamicProperties`. |
+| `--validation <strict          | lenient>`                                                                                    | Define como tratar erros por linha. Padrao: `strict`. |
+| `--strict`                     | Retorna erro (codigo 1) ao final se ainda houver erros de validacao.                         |
+| `--report <path>`              | Salva relatorio JSON da conversao.                                                           |
+| `--input-delimiter <auto       | comma                                                                                        | tab                                                   | semicolon>`                                                               | Delimitador da entrada. Padrao: `auto`. |
+| `--output-delimiter <tab       | comma>`                                                                                      | Delimitador da saida. Padrao: `tab`.                  |
 
 Opcoes adicionais relevantes:
 
@@ -161,6 +162,12 @@ Opcoes adicionais relevantes:
 - `--encoding <utf8|latin1>`: codificacao de entrada/saida;
 - `--normalize-html-entities`: decodifica entidades HTML em campos de texto;
 - `--log-format <text|json>`: formato de log.
+
+### Como funciona `--validation`
+
+- `strict` (padrao): mantem o comportamento atual da conversao. Linhas com erro de validacao sao removidas da saida.
+- `lenient`: nao remove linhas por campo vazio/valor invalido. A saida sempre tem uma linha para cada linha de entrada.
+- No modo `lenient`, valores `undefined`/`null` viram `""` e campos com erro de transformacao/validacao sao gravados como `""` com warning no log.
 
 ### Como funciona o mapping
 
@@ -222,6 +229,13 @@ occur2dwc convert \
   --report ./saida/convert.report.json
 ```
 
+Conversao com validacao explicita:
+
+```bash
+occur2dwc convert input.csv --mapping mapping.json --validation strict
+occur2dwc convert input.csv --mapping mapping.json --validation lenient
+```
+
 ### Exemplo avancado
 
 ```bash
@@ -257,7 +271,7 @@ Move colunas nao mapeadas para um JSON em `dynamicProperties`. Recomendado para 
 Exemplo de valor gerado em `dynamicProperties`:
 
 ```json
-{"codigo_planilha":"LTP-2024-09","habitat":"Floresta ombrofila","status_local":"rara"}
+{ "codigo_planilha": "LTP-2024-09", "habitat": "Floresta ombrofila", "status_local": "rara" }
 ```
 
 Observacoes tecnicas:
@@ -478,11 +492,11 @@ Profiles suportados:
 
 Diferencas principais:
 
-| Profile | Colunas de saida | Campos obrigatorios |
-| --- | --- | --- |
-| `minimal-occurrence` | conjunto minimo (`occurrenceID`, `scientificName`, `decimalLatitude`, `decimalLongitude`) | os 4 campos minimos |
-| `occurrence` | perfil padrao de ocorrencia (inclui taxonomia, localidade, coleta, identificacao e observacoes) | `occurrenceID`, `scientificName`, `decimalLatitude`, `decimalLongitude` |
-| `cncflora-occurrence` | igual ao `occurrence`, com termos adicionais institucionais (`basisOfRecord`, `institutionCode`, `ownerInstitutionCode`) | mesmo conjunto obrigatorio do profile `occurrence` |
+| Profile               | Colunas de saida                                                                                                         | Campos obrigatorios                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `minimal-occurrence`  | conjunto minimo (`occurrenceID`, `scientificName`, `decimalLatitude`, `decimalLongitude`)                                | os 4 campos minimos                                                     |
+| `occurrence`          | perfil padrao de ocorrencia (inclui taxonomia, localidade, coleta, identificacao e observacoes)                          | `occurrenceID`, `scientificName`, `decimalLatitude`, `decimalLongitude` |
+| `cncflora-occurrence` | igual ao `occurrence`, com termos adicionais institucionais (`basisOfRecord`, `institutionCode`, `ownerInstitutionCode`) | mesmo conjunto obrigatorio do profile `occurrence`                      |
 
 ## 13. Exemplos Completos
 

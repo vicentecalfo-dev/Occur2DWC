@@ -126,11 +126,7 @@ export class ValidatorEngine {
     row: Record<string, string | undefined>,
     profile: ConvertProfileDefinition,
   ): ValidationIssue[] {
-    const issues: ValidationIssue[] = validateOccurrenceRow(
-      rowNumber,
-      row as Record<string, string>,
-      profile,
-    ).map((error) =>
+    const issues: ValidationIssue[] = validateOccurrenceRow(rowNumber, row, profile).map((error) =>
       createIssue({
         rowNumber: error.row,
         severity: 'error',

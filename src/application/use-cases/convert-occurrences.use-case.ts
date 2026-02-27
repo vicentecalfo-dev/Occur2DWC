@@ -11,7 +11,11 @@ import {
   resolveOutputDelimiterFromOption,
 } from '../services/convert/delimiters';
 import { applyIdStrategy } from '../services/convert/identifiers';
-import { buildMappingPlan, loadMappingFile, type MappingDocument } from '../services/convert/mapping';
+import {
+  buildMappingPlan,
+  loadMappingFile,
+  type MappingDocument,
+} from '../services/convert/mapping';
 import { getInternalMappingDocument } from '../services/convert/preset-mappings';
 import { resolveMappingPreset } from '../services/convert/preset-detector';
 import { getConvertProfile, getKnownDwcTerms } from '../services/convert/profiles';
@@ -22,12 +26,14 @@ import type {
   ConvertProfileName,
   ConvertReport,
   ConvertValidationError,
+  ConvertValidationMode,
+  ConvertValidationWarning,
   ExtrasMode,
   IdStrategy,
   InputDelimiterOption,
   OutputDelimiterOption,
 } from '../services/convert/types';
-import { validateOccurrenceRow } from '../services/convert/validation';
+import { normalizeOutputValue, validateConvertRow } from '../services/convert/validation';
 import type { CommandOutputPort } from '../ports/command-output.port';
 import { CliError } from '../../shared/errors/cli-error';
 import { formatExecutionSummary } from '../../shared/logging/execution-summary';
@@ -44,6 +50,7 @@ export interface ConvertOccurrencesInput {
   inputDelimiter: InputDelimiterOption;
   outputDelimiter: OutputDelimiterOption;
   encoding: ConvertEncoding;
+  validationMode: ConvertValidationMode;
   strict: boolean;
   reportPath: string | undefined;
   maxErrors: number;
@@ -67,6 +74,19 @@ function appendValidationErrors(
 
   const availableSlots = maxErrors - target.length;
   target.push(...errors.slice(0, availableSlots));
+}
+
+function appendValidationWarnings(
+  target: ConvertValidationWarning[],
+  warnings: readonly ConvertValidationWarning[],
+  maxErrors: number,
+): void {
+  if (target.length >= maxErrors) {
+    return;
+  }
+
+  const availableSlots = maxErrors - target.length;
+  target.push(...warnings.slice(0, availableSlots));
 }
 
 function resolveOutputColumns(
@@ -149,7 +169,8 @@ function createInputStream(inputPath: string | undefined, encoding: ConvertEncod
 
 function createDynamicPropertiesValue(extraValues: Record<string, string>): string {
   const normalizedEntries = Object.entries(extraValues)
-    .filter(([, value]) => value !== undefined && value !== null && value.trim() !== '')
+    .map(([key, value]) => [key, normalizeOutputValue(value)] as const)
+    .filter(([, value]) => value.trim() !== '')
     .sort(([leftKey], [rightKey]) => {
       if (leftKey < rightKey) {
         return -1;
@@ -189,12 +210,14 @@ export class ConvertOccurrencesUseCase {
       inputPath: input.inputPath ?? 'stdin',
       outputPath: input.outputPath,
       profile: input.profile,
+      validationMode: input.validationMode,
       strict: input.strict,
     });
 
     const userMappingFile = await loadMappingFile(input.mapPath);
     let activeMappingFile: MappingDocument | undefined = userMappingFile;
-    let effectiveIdStrategy: IdStrategy = input.idStrategy ?? userMappingFile?.idStrategy ?? 'preserve';
+    let effectiveIdStrategy: IdStrategy =
+      input.idStrategy ?? userMappingFile?.idStrategy ?? 'preserve';
     const profile = getConvertProfile(input.profile);
     const knownDwcTerms = getKnownDwcTerms();
 
@@ -208,7 +231,9 @@ export class ConvertOccurrencesUseCase {
     });
 
     const reportErrors: ConvertValidationError[] = [];
+    const reportWarnings: ConvertValidationWarning[] = [];
     let totalErrorCount = 0;
+    let totalWarningCount = 0;
     let inputRows = 0;
     let outputRows = 0;
     let invalidRows = 0;
@@ -285,10 +310,30 @@ export class ConvertOccurrencesUseCase {
 
         inputRows += 1;
 
-        const rowValues = parseDelimitedLine(rawLine, inputDelimiter);
+        let rowValues: string[];
+
+        try {
+          rowValues = parseDelimitedLine(rawLine, inputDelimiter);
+        } catch {
+          if (input.validationMode === 'strict') {
+            throw new CliError(`Falha ao interpretar a linha ${inputRows}.`, 2);
+          }
+
+          rowValues = [];
+          const warning: ConvertValidationWarning = {
+            row: inputRows,
+            code: 'transformation_error',
+            message: 'Erro de parsing da linha. Campos nao interpretados foram mantidos vazios.',
+          };
+          totalWarningCount += 1;
+          appendValidationWarnings(reportWarnings, [warning], input.maxErrors);
+          logger.warn(`Linha ${warning.row}, campo (linha): ${warning.message}`);
+        }
+
         const mappedValues: Record<string, string> = {};
         const extraValues: Record<string, string> = {};
         const rowErrors: ConvertValidationError[] = [];
+        const rowWarnings: ConvertValidationWarning[] = [];
 
         if (rowValues.length !== headerColumns.length) {
           rowErrors.push({
@@ -299,7 +344,9 @@ export class ConvertOccurrencesUseCase {
         }
 
         for (const [index, columnName] of headerColumns.entries()) {
-          const value = normalizeCellValue(rowValues[index] ?? '', input.normalizeHtmlEntities);
+          const value = normalizeOutputValue(
+            normalizeCellValue(rowValues[index] ?? '', input.normalizeHtmlEntities),
+          );
           const targetField = mappingPlan?.sourceToTarget.get(index);
 
           if (targetField) {
@@ -311,40 +358,108 @@ export class ConvertOccurrencesUseCase {
         }
 
         if (input.deriveEventDate && !mappedValues.eventDate) {
-          const derivedEventDate = deriveEventDate(
-            mappedValues.day,
-            mappedValues.month,
-            mappedValues.year,
-          );
+          try {
+            const derivedEventDate = deriveEventDate(
+              mappedValues.day,
+              mappedValues.month,
+              mappedValues.year,
+            );
 
-          if (derivedEventDate) {
-            mappedValues.eventDate = derivedEventDate;
+            if (derivedEventDate) {
+              mappedValues.eventDate = normalizeOutputValue(derivedEventDate);
+            } else if (
+              input.validationMode === 'lenient' &&
+              mappedValues.day &&
+              mappedValues.month &&
+              mappedValues.year
+            ) {
+              rowWarnings.push({
+                row: inputRows,
+                code: 'invalid_value',
+                message:
+                  'Nao foi possivel derivar eventDate a partir de day/month/year. Campo mantido vazio.',
+                field: 'eventDate',
+              });
+              mappedValues.eventDate = '';
+            }
+          } catch {
+            if (input.validationMode === 'strict') {
+              throw new CliError(`Falha ao derivar eventDate na linha ${inputRows}.`, 2);
+            }
+
+            rowWarnings.push({
+              row: inputRows,
+              code: 'transformation_error',
+              message: 'Erro na transformacao de eventDate. Campo mantido vazio.',
+              field: 'eventDate',
+            });
+            mappedValues.eventDate = '';
           }
         }
 
         applyIdStrategy(effectiveIdStrategy, mappedValues, inputRows);
-        rowErrors.push(...validateOccurrenceRow(inputRows, mappedValues, profile));
 
-        if (rowErrors.length > 0) {
+        const validationResult = validateConvertRow(
+          inputRows,
+          mappedValues,
+          profile,
+          input.validationMode,
+          rowErrors,
+        );
+
+        rowWarnings.push(...validationResult.warnings);
+
+        if (!validationResult.ok) {
           invalidRows += 1;
-          totalErrorCount += rowErrors.length;
-          appendValidationErrors(reportErrors, rowErrors, input.maxErrors);
+          totalErrorCount += validationResult.errors.length;
+          appendValidationErrors(reportErrors, validationResult.errors, input.maxErrors);
           continue;
         }
 
-        const dynamicPropertiesValue =
-          input.extras === 'dynamicProperties' ? createDynamicPropertiesValue(extraValues) : '';
+        if (rowWarnings.length > 0) {
+          totalWarningCount += rowWarnings.length;
+          appendValidationWarnings(reportWarnings, rowWarnings, input.maxErrors);
+
+          for (const warning of rowWarnings) {
+            const fieldName = warning.field ?? '(linha)';
+            logger.warn(`Linha ${warning.row}, campo ${fieldName}: ${warning.message}`);
+          }
+        }
+
+        const normalizedMappedValues = validationResult.normalizedRow;
+        let dynamicPropertiesValue = '';
+
+        if (input.extras === 'dynamicProperties') {
+          try {
+            dynamicPropertiesValue = createDynamicPropertiesValue(extraValues);
+          } catch {
+            if (input.validationMode === 'strict') {
+              throw new CliError(`Falha ao montar dynamicProperties na linha ${inputRows}.`, 2);
+            }
+
+            totalWarningCount += 1;
+            const warning: ConvertValidationWarning = {
+              row: inputRows,
+              code: 'transformation_error',
+              message: 'Erro na montagem de dynamicProperties. Campo mantido vazio.',
+              field: 'dynamicProperties',
+            };
+            appendValidationWarnings(reportWarnings, [warning], input.maxErrors);
+            logger.warn(`Linha ${warning.row}, campo ${warning.field}: ${warning.message}`);
+            dynamicPropertiesValue = '';
+          }
+        }
 
         const outputValues = outputColumns.map((column) => {
           if (input.extras === 'keep' && Object.hasOwn(extraValues, column)) {
-            return extraValues[column] ?? '';
+            return normalizeOutputValue(extraValues[column]);
           }
 
           if (column === 'dynamicProperties' && input.extras === 'dynamicProperties') {
-            return dynamicPropertiesValue;
+            return normalizeOutputValue(dynamicPropertiesValue);
           }
 
-          return mappedValues[column] ?? '';
+          return normalizeOutputValue(normalizedMappedValues[column]);
         });
 
         await writeLine(outputStream, formatDelimitedLine(outputValues, outputDelimiter));
@@ -383,14 +498,17 @@ export class ConvertOccurrencesUseCase {
         outputRows,
         invalidRows,
         errorCount: totalErrorCount,
+        warningCount: totalWarningCount,
         profile: input.profile,
         strict: input.strict,
+        validationMode: input.validationMode,
         idStrategy: effectiveIdStrategy,
         extrasMode: input.extras,
         inputDelimiter,
         outputDelimiter,
       },
       errors: reportErrors,
+      warnings: reportWarnings,
     };
 
     if (input.reportPath) {
@@ -408,14 +526,20 @@ export class ConvertOccurrencesUseCase {
     );
 
     if (totalErrorCount > 0) {
-      logger.error(`Foram encontrados ${totalErrorCount} erro(s) de validacao durante a conversao.`);
+      logger.error(
+        `Foram encontrados ${totalErrorCount} erro(s) de validacao durante a conversao.`,
+      );
+    }
+
+    if (totalWarningCount > 0) {
+      logger.warn(`Foram encontrados ${totalWarningCount} warning(s) durante a conversao.`);
     }
 
     if (input.logFormat === 'json') {
       logger.info('Resumo final da execucao.', {
         processedRows: inputRows,
         validRows: outputRows,
-        warnings: 0,
+        warnings: totalWarningCount,
         errors: totalErrorCount,
         durationMs,
       });
@@ -424,7 +548,7 @@ export class ConvertOccurrencesUseCase {
         formatExecutionSummary({
           processedRows: inputRows,
           validRows: outputRows,
-          warnings: 0,
+          warnings: totalWarningCount,
           errors: totalErrorCount,
           durationMs,
         }),

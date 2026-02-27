@@ -73,6 +73,7 @@ describe('buildProgram', () => {
       inputDelimiter: 'auto',
       outputDelimiter: 'tab',
       encoding: 'utf8',
+      validationMode: 'strict',
       strict: false,
       reportPath: undefined,
       maxErrors: 10,
@@ -109,6 +110,85 @@ describe('buildProgram', () => {
       inputDelimiter: 'auto',
       outputDelimiter: 'tab',
       encoding: 'utf8',
+      validationMode: 'strict',
+      strict: false,
+      reportPath: undefined,
+      maxErrors: 1000,
+      idStrategy: undefined,
+      deriveEventDate: false,
+      extras: 'dynamicProperties',
+      normalizeHtmlEntities: false,
+      logFormat: 'text',
+      quiet: false,
+      verbose: false,
+    });
+  });
+
+  it('should forward validation mode in convert command', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'convert',
+      '--in',
+      'occurrences.csv',
+      '--out',
+      'dwc.csv',
+      '--validation',
+      'lenient',
+    ]);
+
+    expect(dependencies.convertHandler.execute).toHaveBeenCalledWith({
+      inputPath: 'occurrences.csv',
+      outputPath: 'dwc.csv',
+      mapPath: undefined,
+      profile: 'occurrence',
+      preset: 'auto',
+      inputDelimiter: 'auto',
+      outputDelimiter: 'tab',
+      encoding: 'utf8',
+      validationMode: 'lenient',
+      strict: false,
+      reportPath: undefined,
+      maxErrors: 1000,
+      idStrategy: undefined,
+      deriveEventDate: false,
+      extras: 'dynamicProperties',
+      normalizeHtmlEntities: false,
+      logFormat: 'text',
+      quiet: false,
+      verbose: false,
+    });
+  });
+
+  it('should support --mapping as alias for --map', async () => {
+    const dependencies = createMockDependencies();
+    const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+    await program.parseAsync([
+      'node',
+      'occur2dwc',
+      'convert',
+      '--in',
+      'occurrences.csv',
+      '--out',
+      'dwc.csv',
+      '--mapping',
+      'mapping.json',
+    ]);
+
+    expect(dependencies.convertHandler.execute).toHaveBeenCalledWith({
+      inputPath: 'occurrences.csv',
+      outputPath: 'dwc.csv',
+      mapPath: 'mapping.json',
+      profile: 'occurrence',
+      preset: 'auto',
+      inputDelimiter: 'auto',
+      outputDelimiter: 'tab',
+      encoding: 'utf8',
+      validationMode: 'strict',
       strict: false,
       reportPath: undefined,
       maxErrors: 1000,

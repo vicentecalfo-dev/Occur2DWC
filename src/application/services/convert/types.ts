@@ -12,6 +12,8 @@ export type ExtrasMode = 'keep' | 'drop' | 'dynamicProperties';
 
 export type ConvertMappingPreset = 'auto' | 'cncflora-proflora' | 'none';
 
+export type ConvertValidationMode = 'strict' | 'lenient';
+
 export interface ConvertValidationError {
   row: number;
   code:
@@ -23,18 +25,28 @@ export interface ConvertValidationError {
   field?: string;
 }
 
+export interface ConvertValidationWarning {
+  row: number;
+  code: 'missing_value' | 'invalid_value' | 'column_mismatch' | 'transformation_error';
+  message: string;
+  field?: string;
+}
+
 export interface ConvertReport {
   summary: {
     inputRows: number;
     outputRows: number;
     invalidRows: number;
     errorCount: number;
+    warningCount: number;
     profile: ConvertProfileName;
     strict: boolean;
+    validationMode: ConvertValidationMode;
     idStrategy: IdStrategy;
     extrasMode: ExtrasMode;
     inputDelimiter: '\t' | ',' | ';';
     outputDelimiter: '\t' | ',';
   };
   errors: ConvertValidationError[];
+  warnings?: ConvertValidationWarning[];
 }

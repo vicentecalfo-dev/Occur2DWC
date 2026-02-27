@@ -40,11 +40,13 @@ Opcoes principais:
 - `--in <path>`
 - `--out <path>`
 - `--map <path>`
+- `--mapping <path>` (alias de `--map`)
 - `--preset <auto|cncflora-proflora|none>`
 - `--profile <minimal-occurrence|occurrence|cncflora-occurrence>`
 - `--input-delimiter <auto|comma|tab|semicolon>`
 - `--output-delimiter <tab|comma>`
 - `--encoding <utf8|latin1>`
+- `--validation <strict|lenient>` (padrao: `strict`)
 - `--strict`
 - `--report <path>`
 - `--max-errors <n>`

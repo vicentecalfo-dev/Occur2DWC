@@ -10,10 +10,15 @@ import { parseDelimitedLine } from '../../src/application/services/convert/delim
 
 class MemoryOutput {
   readonly infos: string[] = [];
+  readonly warnings: string[] = [];
   readonly errors: string[] = [];
 
   info(message: string): void {
     this.infos.push(message);
+  }
+
+  warn(message: string): void {
+    this.warnings.push(message);
   }
 
   error(message: string): void {
@@ -147,6 +152,170 @@ describe('convert command integration', () => {
         name: 'CliError',
         exitCode: 2,
       });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should skip invalid row in validation strict mode', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'occur2dwc-it-'));
+
+    try {
+      const inputPath = join(tempDir, 'input.csv');
+      const outputPath = join(tempDir, 'output.tsv');
+      const reportPath = join(tempDir, 'report.json');
+
+      await writeFile(
+        inputPath,
+        [
+          'occurrenceid,scientificName,decimallatitude,decimallongitude',
+          ',Nome válido,-10.5,-52.3',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const output = new MemoryOutput();
+      const dependencies = createCliDependencies(output);
+      const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+      await program.parseAsync([
+        'node',
+        'occur2dwc',
+        'convert',
+        '--in',
+        inputPath,
+        '--out',
+        outputPath,
+        '--report',
+        reportPath,
+        '--validation',
+        'strict',
+      ]);
+
+      const outputLines = (await readFile(outputPath, 'utf8')).trim().split('\n');
+      const reportContent = JSON.parse(await readFile(reportPath, 'utf8')) as {
+        summary: {
+          inputRows: number;
+          outputRows: number;
+          invalidRows: number;
+          errorCount: number;
+        };
+      };
+
+      expect(outputLines.length).toBe(1);
+      expect(reportContent.summary.inputRows).toBe(1);
+      expect(reportContent.summary.outputRows).toBe(0);
+      expect(reportContent.summary.invalidRows).toBe(1);
+      expect(reportContent.summary.errorCount).toBeGreaterThanOrEqual(1);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should keep all rows in validation lenient mode and convert missing values to empty strings', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'occur2dwc-it-'));
+
+    try {
+      const inputPath = join(tempDir, 'input.csv');
+      const outputPath = join(tempDir, 'output.tsv');
+      const reportPath = join(tempDir, 'report.json');
+
+      await writeFile(
+        inputPath,
+        [
+          'occurrenceid,scientificName,decimallatitude,decimallongitude',
+          ',Nome válido,-10.5,-52.3',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const output = new MemoryOutput();
+      const dependencies = createCliDependencies(output);
+      const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+      await program.parseAsync([
+        'node',
+        'occur2dwc',
+        'convert',
+        '--in',
+        inputPath,
+        '--out',
+        outputPath,
+        '--report',
+        reportPath,
+        '--validation',
+        'lenient',
+      ]);
+
+      const outputLines = (await readFile(outputPath, 'utf8')).trim().split('\n');
+      const header = parseDelimitedLine(outputLines[0] ?? '', '\t');
+      const row = parseDelimitedLine(outputLines[1] ?? '', '\t');
+      const occurrenceIdIndex = header.indexOf('occurrenceID');
+      const reportContent = JSON.parse(await readFile(reportPath, 'utf8')) as {
+        summary: {
+          inputRows: number;
+          outputRows: number;
+          invalidRows: number;
+          errorCount: number;
+        };
+      };
+
+      expect(outputLines.length).toBe(2);
+      expect(occurrenceIdIndex).toBeGreaterThanOrEqual(0);
+      expect(row[occurrenceIdIndex]).toBe('');
+      expect(reportContent.summary.inputRows).toBe(1);
+      expect(reportContent.summary.outputRows).toBe(1);
+      expect(reportContent.summary.invalidRows).toBe(0);
+      expect(reportContent.summary.errorCount).toBe(0);
+      expect(output.warnings.some((entry) => entry.includes('missing value'))).toBe(true);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should keep row and blank invalid field in validation lenient mode', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'occur2dwc-it-'));
+
+    try {
+      const inputPath = join(tempDir, 'input.csv');
+      const outputPath = join(tempDir, 'output.tsv');
+      await writeFile(
+        inputPath,
+        [
+          'occurrenceid,scientificName,decimallatitude,decimallongitude',
+          'id-1,Nome válido,100,-52.3',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const output = new MemoryOutput();
+      const dependencies = createCliDependencies(output);
+      const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+      await program.parseAsync([
+        'node',
+        'occur2dwc',
+        'convert',
+        '--in',
+        inputPath,
+        '--out',
+        outputPath,
+        '--validation',
+        'lenient',
+      ]);
+
+      const outputLines = (await readFile(outputPath, 'utf8')).trim().split('\n');
+      const header = parseDelimitedLine(outputLines[0] ?? '', '\t');
+      const row = parseDelimitedLine(outputLines[1] ?? '', '\t');
+      const latitudeIndex = header.indexOf('decimalLatitude');
+      const longitudeIndex = header.indexOf('decimalLongitude');
+
+      expect(outputLines.length).toBe(2);
+      expect(latitudeIndex).toBeGreaterThanOrEqual(0);
+      expect(longitudeIndex).toBeGreaterThanOrEqual(0);
+      expect(row[latitudeIndex]).toBe('');
+      expect(row[longitudeIndex]).toBe('-52.3');
+      expect(output.warnings.some((entry) => entry.includes('decimalLatitude'))).toBe(true);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
