@@ -304,7 +304,8 @@ export class ConvertOccurrencesUseCase {
           continue;
         }
 
-        if (rawLine.trim() === '') {
+        const isBlankLine = rawLine.trim() === '';
+        if (isBlankLine && input.validationMode === 'strict') {
           continue;
         }
 
@@ -312,22 +313,26 @@ export class ConvertOccurrencesUseCase {
 
         let rowValues: string[];
 
-        try {
-          rowValues = parseDelimitedLine(rawLine, inputDelimiter);
-        } catch {
-          if (input.validationMode === 'strict') {
-            throw new CliError(`Falha ao interpretar a linha ${inputRows}.`, 2);
-          }
+        if (isBlankLine) {
+          rowValues = headerColumns.map(() => '');
+        } else {
+          try {
+            rowValues = parseDelimitedLine(rawLine, inputDelimiter);
+          } catch {
+            if (input.validationMode === 'strict') {
+              throw new CliError(`Falha ao interpretar a linha ${inputRows}.`, 2);
+            }
 
-          rowValues = [];
-          const warning: ConvertValidationWarning = {
-            row: inputRows,
-            code: 'transformation_error',
-            message: 'Erro de parsing da linha. Campos nao interpretados foram mantidos vazios.',
-          };
-          totalWarningCount += 1;
-          appendValidationWarnings(reportWarnings, [warning], input.maxErrors);
-          logger.warn(`Linha ${warning.row}, campo (linha): ${warning.message}`);
+            rowValues = [];
+            const warning: ConvertValidationWarning = {
+              row: inputRows,
+              code: 'transformation_error',
+              message: 'Erro de parsing da linha. Campos nao interpretados foram mantidos vazios.',
+            };
+            totalWarningCount += 1;
+            appendValidationWarnings(reportWarnings, [warning], input.maxErrors);
+            logger.warn(`Linha ${warning.row}, campo (linha): ${warning.message}`);
+          }
         }
 
         const mappedValues: Record<string, string> = {};

@@ -321,6 +321,70 @@ describe('convert command integration', () => {
     }
   });
 
+  it('should keep blank input rows in validation lenient mode', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'occur2dwc-it-'));
+
+    try {
+      const inputPath = join(tempDir, 'input.csv');
+      const outputPath = join(tempDir, 'output.tsv');
+      const reportPath = join(tempDir, 'report.json');
+
+      await writeFile(
+        inputPath,
+        [
+          'occurrenceid,scientificName,decimallatitude,decimallongitude',
+          'id-1,Nome válido,-10.5,-52.3',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const output = new MemoryOutput();
+      const dependencies = createCliDependencies(output);
+      const program = buildProgram({ dependencies, version: '0.0.0-test' });
+
+      await program.parseAsync([
+        'node',
+        'occur2dwc',
+        'convert',
+        '--in',
+        inputPath,
+        '--out',
+        outputPath,
+        '--report',
+        reportPath,
+        '--validation',
+        'lenient',
+      ]);
+
+      const outputContent = await readFile(outputPath, 'utf8');
+      const outputLines = outputContent.endsWith('\n')
+        ? outputContent.slice(0, -1).split('\n')
+        : outputContent.split('\n');
+      const header = parseDelimitedLine(outputLines[0] ?? '', '\t');
+      const blankRow = parseDelimitedLine(outputLines[2] ?? '', '\t');
+      const occurrenceIdIndex = header.indexOf('occurrenceID');
+      const reportContent = JSON.parse(await readFile(reportPath, 'utf8')) as {
+        summary: {
+          inputRows: number;
+          outputRows: number;
+          invalidRows: number;
+          errorCount: number;
+        };
+      };
+
+      expect(outputLines.length).toBe(3);
+      expect(occurrenceIdIndex).toBeGreaterThanOrEqual(0);
+      expect(blankRow[occurrenceIdIndex]).toBe('');
+      expect(reportContent.summary.inputRows).toBe(2);
+      expect(reportContent.summary.outputRows).toBe(2);
+      expect(reportContent.summary.invalidRows).toBe(0);
+      expect(reportContent.summary.errorCount).toBe(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('should fail with exit code 1 in strict mode when validation errors exist', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'occur2dwc-it-'));
 
