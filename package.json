@@ -1,6 +1,6 @@
 {
   "name": "@cncflora/occur2dwc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI para inicializar, converter, validar e empacotar dados de ocorrencia em Darwin Core (DwC).",
   "license": "MIT",
   "author": "Vicente Calfo <vicentecalfo@jbrj.gov.br>",
